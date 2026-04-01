@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏓 Pong</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 14px; }
+    canvas {
+      background: #111827;
+      border: 3px solid #4d96ff;
+      border-radius: 8px;
+    }
+    #info { margin-top: 12px; font-size: 0.9rem; color: #888; }
+    button {
+      margin-top: 14px;
+      background: #4d96ff; color: #fff;
+      border: none; padding: 10px 30px;
+      border-radius: 8px; font-size: 1rem; cursor: pointer;
+    }
+    button:hover { background: #2979d8; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🏓 Pong</h1>
+  <canvas id="c" width="600" height="400"></canvas>
+  <div id="info">W/S to move your paddle &nbsp;|&nbsp; First to 7 wins</div>
+  <button id="btn" onclick="toggleGame()">Start Game</button>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const btn = document.getElementById('btn');
+    const W = canvas.width, H = canvas.height;
+
+    const PAD_W = 12, PAD_H = 80, BALL_R = 8;
+    const WIN_SCORE = 7;
+
+    let player, ai, ball, running = false, animId;
+
+    function reset() {
+      player = { x: 20, y: H / 2 - PAD_H / 2, w: PAD_W, h: PAD_H, score: 0, vy: 0 };
+      ai     = { x: W - 20 - PAD_W, y: H / 2 - PAD_H / 2, w: PAD_W, h: PAD_H, score: 0 };
+      resetBall(1);
+    }
+
+    function resetBall(dir) {
+      const angle = (Math.random() * 0.6 - 0.3);
+      const speed = 5;
+      ball = { x: W / 2, y: H / 2, vx: Math.cos(angle) * speed * dir, vy: Math.sin(angle) * speed };
+    }
+
+    const keys = {};
+    document.addEventListener('keydown', e => { keys[e.key] = true; });
+    document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    function update() {
+      // player
+      const speed = 6;
+      if ((keys['w'] || keys['W'] || keys['ArrowUp']) && player.y > 0) player.y -= speed;
+      if ((keys['s'] || keys['S'] || keys['ArrowDown']) && player.y + player.h < H) player.y += speed;
+
+      // AI
+      const aiCenter = ai.y + ai.h / 2;
+      const aiSpeed = 4.5;
+      if (aiCenter < ball.y - 5) ai.y = Math.min(ai.y + aiSpeed, H - ai.h);
+      else if (aiCenter > ball.y + 5) ai.y = Math.max(ai.y - aiSpeed, 0);
+
+      // ball
+      ball.x += ball.vx; ball.y += ball.vy;
+      if (ball.y - BALL_R < 0) { ball.y = BALL_R; ball.vy = Math.abs(ball.vy); }
+      if (ball.y + BALL_R > H) { ball.y = H - BALL_R; ball.vy = -Math.abs(ball.vy); }
+
+      // paddle collision
+      [player, ai].forEach((pad, i) => {
+        if (ball.x - BALL_R < pad.x + pad.w && ball.x + BALL_R > pad.x &&
+            ball.y - BALL_R < pad.y + pad.h && ball.y + BALL_R > pad.y) {
+          const hitPos = (ball.y - (pad.y + pad.h / 2)) / (pad.h / 2);
+          const angle = hitPos * (Math.PI / 3.5);
+          const speed = Math.min(Math.hypot(ball.vx, ball.vy) * 1.04, 16);
+          ball.vx = (i === 0 ? 1 : -1) * Math.cos(angle) * speed;
+          ball.vy = Math.sin(angle) * speed;
+          ball.x = i === 0 ? pad.x + pad.w + BALL_R + 1 : pad.x - BALL_R - 1;
+        }
+      });
+
+      // scoring
+      if (ball.x < 0) { ai.score++; checkWin(ai, 'AI'); }
+      if (ball.x > W) { player.score++; checkWin(player, 'You'); }
+    }
+
+    function checkWin(pad, who) {
+      if (pad.score >= WIN_SCORE) {
+        running = false;
+        cancelAnimationFrame(animId);
+        btn.textContent = 'Play Again';
+        draw();
+        ctx.fillStyle = '#0f0f1acc';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#ffd93d';
+        ctx.font = 'bold 48px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.fillText(who === 'You' ? '🏆 You Win!' : '💀 AI Wins!', W / 2, H / 2 - 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '22px Segoe UI';
+        ctx.fillText(`${player.score} : ${ai.score}`, W / 2, H / 2 + 25);
+      } else {
+        resetBall(ball.x < 0 ? 1 : -1);
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(0, 0, W, H);
+
+      // centre line
+      ctx.setLineDash([10, 10]);
+      ctx.strokeStyle = '#ffffff22';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // scores
+      ctx.fillStyle = '#ffffff33';
+      ctx.font = 'bold 64px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText(player.score, W / 4, 80);
+      ctx.fillText(ai.score, W * 3 / 4, 80);
+
+      // paddles
+      [player, ai].forEach(pad => {
+        ctx.fillStyle = '#4d96ff';
+        ctx.beginPath();
+        ctx.roundRect(pad.x, pad.y, pad.w, pad.h, 4);
+        ctx.fill();
+      });
+
+      // ball
+      ctx.fillStyle = '#ffd93d';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function loop() {
+      update(); draw();
+      if (running) animId = requestAnimationFrame(loop);
+    }
+
+    function toggleGame() {
+      if (!running) {
+        reset();
+        running = true;
+        btn.textContent = 'Restart';
+        loop();
+      } else {
+        cancelAnimationFrame(animId);
+        reset();
+        draw();
+      }
+    }
+
+    reset(); draw();
+
+    // welcome text
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press Start Game', W / 2, H / 2);
+  </script>
+</body>
+</html>

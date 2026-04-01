@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎮 Game Hub</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #fff;
+      min-height: 100vh;
+    }
+    header {
+      text-align: center;
+      padding: 50px 20px 20px;
+    }
+    header h1 {
+      font-size: 3rem;
+      background: linear-gradient(135deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p { color: #aaa; margin-top: 8px; font-size: 1.1rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 24px;
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 24px 60px;
+    }
+    .card {
+      background: #1a1a2e;
+      border-radius: 16px;
+      padding: 28px 22px;
+      text-decoration: none;
+      color: inherit;
+      border: 2px solid transparent;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .card:hover {
+      transform: translateY(-6px);
+      border-color: #4d96ff;
+      box-shadow: 0 8px 30px rgba(77,150,255,0.25);
+    }
+    .card .icon { font-size: 3rem; margin-bottom: 14px; }
+    .card h2 { font-size: 1.2rem; margin-bottom: 6px; }
+    .card p { color: #888; font-size: 0.88rem; line-height: 1.5; }
+    .badge {
+      display: inline-block;
+      margin-top: 12px;
+      background: #4d96ff22;
+      color: #4d96ff;
+      border: 1px solid #4d96ff55;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎮 Game Hub</h1>
+    <p>Pick a game and start playing — all run in your browser, no downloads needed!</p>
+  </header>
+  <div class="grid">
+    <a class="card" href="games/snake.html">
+      <div class="icon">🐍</div>
+      <h2>Snake</h2>
+      <p>Guide the snake to eat food and grow as long as possible without hitting the walls or yourself.</p>
+      <span class="badge">Arrow Keys</span>
+    </a>
+    <a class="card" href="games/tetris.html">
+      <div class="icon">🟦</div>
+      <h2>Tetris</h2>
+      <p>Stack falling tetrominoes to clear lines and rack up points before the board fills up.</p>
+      <span class="badge">Arrow Keys</span>
+    </a>
+    <a class="card" href="games/pong.html">
+      <div class="icon">🏓</div>
+      <h2>Pong</h2>
+      <p>Classic two-paddle ping-pong against a challenging AI opponent.</p>
+      <span class="badge">W / S Keys</span>
+    </a>
+    <a class="card" href="games/breakout.html">
+      <div class="icon">🧱</div>
+      <h2>Breakout</h2>
+      <p>Bounce the ball with your paddle and smash all the bricks before you run out of lives.</p>
+      <span class="badge">Arrow Keys / Mouse</span>
+    </a>
+    <a class="card" href="games/2048.html">
+      <div class="icon">🔢</div>
+      <h2>2048</h2>
+      <p>Slide numbered tiles on the grid to combine them and reach the 2048 tile!</p>
+      <span class="badge">Arrow Keys / Swipe</span>
+    </a>
+    <a class="card" href="games/memory.html">
+      <div class="icon">🃏</div>
+      <h2>Memory Match</h2>
+      <p>Flip cards and find all matching emoji pairs in the fewest moves possible.</p>
+      <span class="badge">Mouse / Touch</span>
+    </a>
+    <a class="card" href="games/whack-a-mole.html">
+      <div class="icon">🐹</div>
+      <h2>Whack-a-Mole</h2>
+      <p>Whack the moles as fast as you can before time runs out! Watch out for the bad guys.</p>
+      <span class="badge">Mouse / Touch</span>
+    </a>
+    <a class="card" href="games/minesweeper.html">
+      <div class="icon">💣</div>
+      <h2>Minesweeper</h2>
+      <p>Reveal all safe cells on the grid without detonating a single hidden mine.</p>
+      <span class="badge">Left / Right Click</span>
+    </a>
+    <a class="card" href="games/flappy-bird.html">
+      <div class="icon">🐦</div>
+      <h2>Flappy Bird</h2>
+      <p>Tap or press Space to keep the bird airborne and fly through the gaps in the pipes.</p>
+      <span class="badge">Space / Tap</span>
+    </a>
+    <a class="card" href="games/typing-speed.html">
+      <div class="icon">⌨️</div>
+      <h2>Typing Speed</h2>
+      <p>Race against the clock — type the paragraph as fast and accurately as you can!</p>
+      <span class="badge">Keyboard</span>
+    </a>
+  </div>
+</body>
+</html>
