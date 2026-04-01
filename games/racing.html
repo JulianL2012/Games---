@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏎️ Racing</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    #info { display: flex; gap: 22px; margin-bottom: 10px; font-size: 0.95rem; }
+    #info span { background: #1a1a2e; padding: 5px 14px; border-radius: 8px; }
+    canvas { border: 3px solid #4d96ff; border-radius: 10px; }
+    #hint { margin-top: 10px; color: #888; font-size: 0.85rem; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Hub</a>
+  <h1>🏎️ Racing</h1>
+  <div id="info">
+    <span>Speed: <b id="speed">0</b> km/h</span>
+    <span>Score: <b id="score">0</b></span>
+    <span>Best: <b id="best">0</b></span>
+    <span>Lap: <b id="lap">0</b></span>
+  </div>
+  <canvas id="c" width="520" height="480"></canvas>
+  <p id="hint">← → / A D to steer &nbsp;| ↑ / W Accelerate &nbsp;| ↓ / S Brake</p>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    // Road scrolls toward player — pseudo-3D style
+    const ROAD_TOP_W = 120, ROAD_BOT_W = W * 0.9;
+    const HORIZON_Y = H * 0.38;
+    const SEGMENTS = 200;
+    const SEG_H = (H - HORIZON_Y) / 30;
+
+    let car, scroll, speed, score, bestScore, state, lap, frame;
+    let obstaclesCars = [];
+
+    const COLORS_ROAD = [['#444','#555'],['#333','#444']];
+    const STRIPE_COLORS = ['#fff','#fff'];
+    const GRASS_COLORS = ['#2d6a2d','#1a4a1a'];
+
+    function startGame() {
+      car = { x: W / 2, steer: 0, offset: 0 };
+      scroll = 0; speed = 0; score = 0; lap = 0; frame = 0; state = 'playing';
+      obstaclesCars = [];
+      if (!bestScore) bestScore = 0;
+      updateUI();
+    }
+
+    function updateUI() {
+      document.getElementById('speed').textContent = Math.floor(speed * 40);
+      document.getElementById('score').textContent = Math.floor(score);
+      document.getElementById('best').textContent = Math.floor(bestScore);
+      document.getElementById('lap').textContent = lap;
+    }
+
+    const keys = {};
+    document.addEventListener('keydown', e => { keys[e.code] = true; if (state !== 'playing') startGame(); });
+    document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+    function spawnObstacle() {
+      const lane = Math.random() < 0.5 ? -0.3 : 0.3;
+      obstaclesCars.push({ z: 0.02, lane, color: `hsl(${Math.random() * 360},70%,50%)`, speed: 0.3 + Math.random() * 0.4 });
+    }
+
+    let spawnCD = 80;
+
+    function project(z) {
+      // z in [0,1] where 0=horizon, 1=bottom
+      const t = Math.pow(z, 0.7);
+      const roadW = ROAD_TOP_W + (ROAD_BOT_W - ROAD_TOP_W) * t;
+      const screenY = HORIZON_Y + (H - HORIZON_Y) * t;
+      const roadX = W / 2 - roadW / 2;
+      return { y: screenY, roadX, roadW };
+    }
+
+    let lastTS = 0;
+    function loop(ts) {
+      const dt = Math.min((ts - lastTS) / 16, 3); lastTS = ts;
+      if (state === 'playing') update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt) {
+      frame += dt;
+      // accelerate/brake
+      const maxSpeed = 6;
+      if (keys['ArrowUp'] || keys['KeyW']) speed = Math.min(maxSpeed, speed + 0.08 * dt);
+      else if (keys['ArrowDown'] || keys['KeyS']) speed = Math.max(0, speed - 0.15 * dt);
+      else speed = Math.max(0, speed - 0.04 * dt);
+
+      // steer
+      if (keys['ArrowLeft'] || keys['KeyA']) car.offset -= speed * 0.06 * dt;
+      if (keys['ArrowRight'] || keys['KeyD']) car.offset += speed * 0.06 * dt;
+      car.offset = Math.max(-0.8, Math.min(0.8, car.offset));
+
+      // road curves (simple sine)
+      const curveFactor = Math.sin(scroll * 0.02) * 0.015;
+      car.offset += curveFactor * speed * dt;
+
+      scroll += speed * dt;
+      score += speed * dt * 2;
+      if (score > bestScore) bestScore = score;
+      if (Math.floor(scroll / 200) > lap) { lap = Math.floor(scroll / 200); score += 500; }
+      updateUI();
+
+      // off road
+      if (Math.abs(car.offset) > 0.85) { speed *= 0.92; }
+
+      // obstacles
+      spawnCD -= dt;
+      if (spawnCD <= 0 && speed > 1) { spawnObstacle(); spawnCD = 40 + Math.random() * 40; }
+      obstaclesCars.forEach(o => { o.z += (speed - o.speed) * 0.005 * dt; });
+      obstaclesCars = obstaclesCars.filter(o => o.z < 1.1);
+
+      // collision
+      obstaclesCars.forEach(o => {
+        if (o.z > 0.85 && Math.abs(o.lane - car.offset) < 0.22) {
+          speed *= 0.5; score = Math.max(0, score - 100);
+        }
+      });
+    }
+
+    function draw() {
+      // Sky
+      const sky = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+      sky.addColorStop(0, '#0a0a1a'); sky.addColorStop(1, '#1a2a3a');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, HORIZON_Y);
+
+      // Hills
+      ctx.fillStyle = '#1a3a1a';
+      ctx.beginPath(); ctx.moveTo(0, HORIZON_Y);
+      for (let x = 0; x <= W; x += 20) ctx.lineTo(x, HORIZON_Y - 15 * Math.sin((x + scroll * 0.5) * 0.02));
+      ctx.lineTo(W, HORIZON_Y); ctx.closePath(); ctx.fill();
+
+      // Road segments
+      const segsVisible = 30;
+      for (let s = segsVisible; s >= 0; s--) {
+        const z0 = s / segsVisible, z1 = (s + 1) / segsVisible;
+        const p0 = project(z0), p1 = project(z1);
+        const segIdx = Math.floor(scroll + s) % 2;
+        const curve = Math.sin((scroll + s) * 0.02) * (1 - z0) * 60;
+
+        // grass
+        ctx.fillStyle = GRASS_COLORS[segIdx];
+        ctx.fillRect(0, p0.y, p0.roadX + curve, p1.y - p0.y);
+        ctx.fillRect(p0.roadX + p0.roadW + curve, p0.y, W - p0.roadX - p0.roadW - curve, p1.y - p0.y);
+
+        // road
+        ctx.fillStyle = COLORS_ROAD[segIdx][0];
+        ctx.fillRect(p0.roadX + curve, p0.y, p0.roadW, p1.y - p0.y);
+
+        // center stripe
+        if (segIdx === 0) {
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(W / 2 - 3 + curve, p0.y, 6, p1.y - p0.y);
+        }
+        // edge stripes
+        ctx.fillStyle = STRIPE_COLORS[segIdx];
+        ctx.fillRect(p0.roadX + curve, p0.y, 10, p1.y - p0.y);
+        ctx.fillRect(p0.roadX + p0.roadW + curve - 10, p0.y, 10, p1.y - p0.y);
+      }
+
+      // Obstacle cars
+      obstaclesCars.forEach(o => {
+        if (o.z < 0.1) return;
+        const p = project(o.z);
+        const cw = p.roadW * 0.15, ch = cw * 1.6;
+        const cx = p.roadX + p.roadW / 2 + o.lane * p.roadW / 2 - cw / 2 + Math.sin(scroll * 0.02) * (1 - o.z) * 60;
+        const cy = p.y - ch;
+        ctx.fillStyle = o.color;
+        ctx.fillRect(cx, cy, cw, ch);
+        ctx.fillStyle = '#000a';
+        ctx.fillRect(cx + 3, cy + 3, cw - 6, ch * 0.4);
+        ctx.fillRect(cx + 3, cy + ch * 0.6, cw - 6, ch * 0.35);
+        // wheels
+        ctx.fillStyle = '#000';
+        ctx.fillRect(cx - 3, cy + ch * 0.2, 4, 8); ctx.fillRect(cx + cw - 1, cy + ch * 0.2, 4, 8);
+        ctx.fillRect(cx - 3, cy + ch * 0.65, 4, 8); ctx.fillRect(cx + cw - 1, cy + ch * 0.65, 4, 8);
+      });
+
+      // Player car
+      const carCX = W / 2 + car.offset * ROAD_BOT_W / 2;
+      const carW = 50, carH = 80;
+      ctx.fillStyle = '#4d96ff';
+      ctx.fillRect(carCX - carW / 2, H - carH - 10, carW, carH);
+      ctx.fillStyle = '#2255aa';
+      ctx.fillRect(carCX - carW / 2 + 5, H - carH - 10 + 10, carW - 10, carH * 0.4);
+      ctx.fillRect(carCX - carW / 2 + 5, H - carH - 10 + carH * 0.55, carW - 10, carH * 0.3);
+      // wheels
+      ctx.fillStyle = '#222';
+      ctx.fillRect(carCX - carW / 2 - 6, H - carH - 10 + 8, 8, 18);
+      ctx.fillRect(carCX + carW / 2 - 2, H - carH - 10 + 8, 8, 18);
+      ctx.fillRect(carCX - carW / 2 - 6, H - 30, 8, 18);
+      ctx.fillRect(carCX + carW / 2 - 2, H - 30, 8, 18);
+      // headlights
+      ctx.fillStyle = '#ffd93d';
+      ctx.fillRect(carCX - carW / 2 + 3, H - carH - 10, 10, 6);
+      ctx.fillRect(carCX + carW / 2 - 13, H - carH - 10, 10, 6);
+      // tail
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(carCX - carW / 2 + 3, H - 18, 10, 6);
+      ctx.fillRect(carCX + carW / 2 - 13, H - 18, 10, 6);
+
+      // speed bar
+      ctx.fillStyle = '#1a1a2e'; ctx.fillRect(10, H - 20, 120, 10);
+      ctx.fillStyle = speed > 4 ? '#ff9800' : '#6bcb77';
+      ctx.fillRect(10, H - 20, 120 * (speed / 6), 10);
+      ctx.fillStyle = '#fff'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'left';
+      ctx.fillText(Math.floor(speed * 40) + ' km/h', 136, H - 11);
+
+      if (state === 'idle' || state === undefined) {
+        ctx.fillStyle = '#0008'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 30px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🏎️ Racing', W / 2, H / 2 - 20);
+        ctx.font = '16px Segoe UI'; ctx.fillStyle = '#ccc';
+        ctx.fillText('Press any key to start!', W / 2, H / 2 + 14);
+      }
+    }
+
+    state = 'idle';
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
