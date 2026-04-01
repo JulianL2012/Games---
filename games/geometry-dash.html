@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎮 Geometry Dash</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 10px; }
+    canvas { border: 3px solid #4d96ff; border-radius: 10px; cursor: pointer; }
+    #hint { margin-top: 10px; color: #888; font-size: 0.9rem; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🎮 Geometry Dash</h1>
+  <canvas id="c" width="600" height="300"></canvas>
+  <p id="hint">Space / Click / Tap to jump. Double-jump allowed!</p>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    const GROUND_Y = H - 50;
+    const GRAVITY = 0.7, JUMP_V = -13, SPEED_BASE = 4;
+    const BLOCK_W = 40, BLOCK_H = 40;
+
+    let player, obstacles, particles, bgOffset, score, hiScore = 0, speed, state, jumpCount;
+    // state: 'idle' | 'playing' | 'dead'
+
+    const COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ba68c8','#4dd0e1'];
+
+    function reset() {
+      player = { x: 80, y: GROUND_Y - BLOCK_H, vy: 0, w: BLOCK_H - 4, h: BLOCK_H - 4, rotation: 0 };
+      obstacles = [];
+      particles = [];
+      bgOffset = 0; score = 0; speed = SPEED_BASE;
+      state = 'idle'; jumpCount = 0;
+    }
+
+    function jump() {
+      if (state === 'idle') { state = 'playing'; }
+      else if (state === 'dead') { reset(); state = 'playing'; }
+      if (state === 'playing' && jumpCount < 2) {
+        player.vy = JUMP_V;
+        jumpCount++;
+        spawnParticles(player.x + player.w / 2, player.y + player.h, '#4d96ff', 5);
+      }
+    }
+
+    canvas.addEventListener('click', jump);
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+    document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); jump(); } });
+
+    function spawnParticles(x, y, color, count) {
+      for (let i = 0; i < count; i++) {
+        particles.push({ x, y, vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 4, r: 4 + Math.random() * 4, color, life: 1 });
+      }
+    }
+
+    let obstacleCooldown = 0;
+    function spawnObstacle() {
+      const type = Math.random();
+      if (type < 0.5) {
+        // single spike
+        obstacles.push({ x: W + 20, y: GROUND_Y - 36, w: 30, h: 36, type: 'spike', color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+      } else if (type < 0.8) {
+        // double spike
+        obstacles.push({ x: W + 20, y: GROUND_Y - 36, w: 30, h: 36, type: 'spike', color: '#ff6b6b' });
+        obstacles.push({ x: W + 60, y: GROUND_Y - 36, w: 30, h: 36, type: 'spike', color: '#ff6b6b' });
+      } else {
+        // floating block
+        obstacles.push({ x: W + 20, y: GROUND_Y - 80, w: BLOCK_W, h: BLOCK_H, type: 'block', color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+      }
+    }
+
+    let lastTS = 0;
+    function update(dt) {
+      if (state !== 'playing') return;
+      score += dt * 0.01;
+      speed = SPEED_BASE + score * 0.01;
+      bgOffset += speed;
+
+      // player physics
+      player.vy += GRAVITY;
+      player.y += player.vy;
+      if (player.y >= GROUND_Y - player.h) {
+        player.y = GROUND_Y - player.h;
+        player.vy = 0;
+        jumpCount = 0;
+      }
+      if (state === 'playing') player.rotation += 6;
+
+      // spawn obstacles
+      obstacleCooldown -= dt;
+      if (obstacleCooldown <= 0) {
+        spawnObstacle();
+        obstacleCooldown = 800 + Math.random() * 600;
+      }
+
+      obstacles.forEach(o => o.x -= speed);
+      obstacles = obstacles.filter(o => o.x + o.w > 0);
+
+      // collision
+      for (const o of obstacles) {
+        if (player.x + player.w - 4 > o.x + 4 && player.x + 4 < o.x + o.w - 4 &&
+            player.y + player.h - 4 > o.y + 4 && player.y + 4 < o.y + o.h - 4) {
+          spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#ff6b6b', 12);
+          state = 'dead';
+          if (score > hiScore) hiScore = score;
+          return;
+        }
+      }
+
+      // particles
+      particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life -= 0.03; });
+      particles = particles.filter(p => p.life > 0);
+    }
+
+    function draw(ts) {
+      const dt = ts - lastTS; lastTS = ts;
+      update(dt);
+
+      // background
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0f0020'); grad.addColorStop(1, '#200040');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+      // bg stars / grid
+      ctx.strokeStyle = '#ffffff08';
+      for (let x = ((-bgOffset * 0.2) % 80) - 80; x < W; x += 80) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+
+      // ground
+      ctx.fillStyle = '#1a1a3a';
+      ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+      ctx.fillStyle = '#4d96ff';
+      ctx.fillRect(0, GROUND_Y, W, 3);
+
+      // obstacles
+      obstacles.forEach(o => {
+        ctx.fillStyle = o.color;
+        if (o.type === 'spike') {
+          ctx.beginPath();
+          ctx.moveTo(o.x, o.y + o.h);
+          ctx.lineTo(o.x + o.w / 2, o.y);
+          ctx.lineTo(o.x + o.w, o.y + o.h);
+          ctx.closePath(); ctx.fill();
+        } else {
+          ctx.fillRect(o.x, o.y, o.w, o.h);
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.fillRect(o.x + 3, o.y + 3, o.w - 6, 6);
+        }
+      });
+
+      // player
+      ctx.save();
+      ctx.translate(player.x + player.w / 2, player.y + player.h / 2);
+      ctx.rotate(player.rotation * Math.PI / 180);
+      const hue = (score * 3) % 360;
+      ctx.fillStyle = `hsl(${hue},80%,60%)`;
+      ctx.fillRect(-player.w / 2, -player.h / 2, player.w, player.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillRect(-player.w / 2 + 4, -player.h / 2 + 4, player.w - 8, 8);
+      // eye
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(4, -4, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(5, -5, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      // particles
+      particles.forEach(p => {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      // HUD
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 20px Segoe UI';
+      ctx.textAlign = 'left';
+      ctx.fillText('Score: ' + Math.floor(score), 12, 30);
+      ctx.textAlign = 'right';
+      ctx.fillText('Best: ' + Math.floor(hiScore), W - 12, 30);
+
+      if (state === 'idle') overlay('Geometry Dash 🎮', 'Space / Click / Tap to jump!', null);
+      if (state === 'dead') overlay('💀 Crashed!', `Score: ${Math.floor(score)}  Best: ${Math.floor(hiScore)}`, 'Click to retry');
+
+      requestAnimationFrame(draw);
+    }
+
+    function overlay(title, sub, hint) {
+      ctx.fillStyle = '#0f0f1acc';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 30px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText(title, W / 2, H / 2 - 30);
+      ctx.fillStyle = '#ccc';
+      ctx.font = '18px Segoe UI';
+      ctx.fillText(sub, W / 2, H / 2 + 8);
+      if (hint) {
+        ctx.fillStyle = '#888';
+        ctx.font = '14px Segoe UI';
+        ctx.fillText(hint, W / 2, H / 2 + 40);
+      }
+    }
+
+    reset();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

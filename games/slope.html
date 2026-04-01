@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚽ Slope</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 10px; }
+    canvas { border: 3px solid #4d96ff; border-radius: 10px; }
+    #hint { margin-top: 10px; color: #888; font-size: 0.9rem; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>⚽ Slope</h1>
+  <canvas id="c" width="480" height="480"></canvas>
+  <p id="hint">← → Arrow keys or A/D to steer. Avoid the red tiles!</p>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    // Pseudo-3D slope game viewed from behind
+    const LANE_COUNT = 7;
+    const SEG_HEIGHT = 60;  // height of one road segment on screen
+    const HORIZON_Y = H * 0.35;
+    const ROAD_TOP_W = 80, ROAD_BOT_W = W * 0.85;
+
+    const BALL_R = 18;
+
+    let laneX, ballLane, score, hiScore = 0, speed, segments, state, keys;
+
+    function laneCenter(lane, seg) {
+      // seg=0 is closest, higher = further
+      const t = seg / (H / SEG_HEIGHT);
+      const roadW = ROAD_TOP_W + (ROAD_BOT_W - ROAD_TOP_W) * (1 - t);
+      const leftEdge = (W - roadW) / 2;
+      return leftEdge + (lane + 0.5) * (roadW / LANE_COUNT);
+    }
+
+    function reset() {
+      ballLane = Math.floor(LANE_COUNT / 2);
+      score = 0; speed = 3; state = 'idle';
+      keys = {};
+      segments = [];
+      for (let i = 0; i < 20; i++) addSegment(i);
+    }
+
+    function addSegment(dist) {
+      const tiles = [];
+      for (let l = 0; l < LANE_COUNT; l++) {
+        tiles.push(Math.random() < 0.25 && dist > 3 ? 'danger' : 'safe');
+      }
+      segments.push(tiles);
+    }
+
+    const keyMap = {};
+    document.addEventListener('keydown', e => {
+      keyMap[e.key] = true;
+      if (state === 'idle' || state === 'dead') start();
+    });
+    document.addEventListener('keyup', e => { keyMap[e.key] = false; });
+
+    let lastMove = 0;
+    function start() {
+      state = 'playing';
+    }
+
+    let offset = 0; // pixel offset into current segment
+    let moveCD = 0;
+
+    function update(dt) {
+      if (state !== 'playing') return;
+      score += dt * speed * 0.01;
+      speed += dt * 0.0005;
+      offset += speed;
+
+      // steer
+      moveCD -= dt;
+      if (moveCD <= 0) {
+        if (keyMap['ArrowLeft'] || keyMap['a'] || keyMap['A']) {
+          ballLane = Math.max(0, ballLane - 1);
+          moveCD = 180;
+        } else if (keyMap['ArrowRight'] || keyMap['d'] || keyMap['D']) {
+          ballLane = Math.min(LANE_COUNT - 1, ballLane + 1);
+          moveCD = 180;
+        }
+      }
+
+      // advance segments
+      while (offset >= SEG_HEIGHT) {
+        offset -= SEG_HEIGHT;
+        segments.shift();
+        addSegment(segments.length);
+        // check lane we're on (closest segment = index 0)
+        const tile = segments[0][ballLane];
+        if (tile === 'danger') { die(); return; }
+      }
+    }
+
+    function die() {
+      state = 'dead';
+      if (score > hiScore) hiScore = score;
+    }
+
+    function drawRoad() {
+      // perspective grid
+      const segsOnScreen = Math.ceil(H / SEG_HEIGHT) + 2;
+      for (let s = segsOnScreen; s >= 0; s--) {
+        const y0 = HORIZON_Y + (s - 1) * SEG_HEIGHT * ((H - HORIZON_Y) / (segsOnScreen * SEG_HEIGHT)) - offset * ((H - HORIZON_Y) / (segsOnScreen * SEG_HEIGHT));
+        const y1 = HORIZON_Y + s * SEG_HEIGHT * ((H - HORIZON_Y) / (segsOnScreen * SEG_HEIGHT)) - offset * ((H - HORIZON_Y) / (segsOnScreen * SEG_HEIGHT));
+        const t0 = (y0 - HORIZON_Y) / (H - HORIZON_Y);
+        const t1 = (y1 - HORIZON_Y) / (H - HORIZON_Y);
+        const w0 = ROAD_TOP_W + (ROAD_BOT_W - ROAD_TOP_W) * t0;
+        const w1 = ROAD_TOP_W + (ROAD_BOT_W - ROAD_TOP_W) * t1;
+        const x0 = (W - w0) / 2, x1 = (W - w1) / 2;
+
+        const tiles = segments[s] || [];
+        for (let l = 0; l < LANE_COUNT; l++) {
+          const lx0 = x0 + l * w0 / LANE_COUNT, lx1 = x0 + (l + 1) * w0 / LANE_COUNT;
+          const ly0 = x1 + l * w1 / LANE_COUNT, ly1 = x1 + (l + 1) * w1 / LANE_COUNT;
+          const isDanger = tiles[l] === 'danger';
+          ctx.fillStyle = isDanger ? '#ff4444' : (s % 2 === 0 ? '#1a2a4a' : '#1e3055');
+          ctx.beginPath();
+          ctx.moveTo(lx0, y0); ctx.lineTo(lx1, y0);
+          ctx.lineTo(ly1, y1); ctx.lineTo(ly0, y1);
+          ctx.closePath(); ctx.fill();
+          // lane line
+          ctx.strokeStyle = '#4d96ff33';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(lx0, y0); ctx.lineTo(ly0, y1);
+          ctx.stroke();
+        }
+        // right edge
+        ctx.strokeStyle = '#4d96ff33';
+        ctx.beginPath();
+        ctx.moveTo(x0 + w0, y0); ctx.lineTo(x1 + w1, y1);
+        ctx.stroke();
+      }
+    }
+
+    function drawBall() {
+      const bx = W / 2 - ROAD_BOT_W / 2 + (ballLane + 0.5) * (ROAD_BOT_W / LANE_COUNT);
+      const by = H - 60;
+      const grad = ctx.createRadialGradient(bx - 6, by - 6, 2, bx, by, BALL_R);
+      grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, '#4d96ff'); grad.addColorStop(1, '#0a2a66');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(bx, by, BALL_R, 0, Math.PI * 2); ctx.fill();
+      // shadow
+      ctx.fillStyle = '#0004';
+      ctx.beginPath(); ctx.ellipse(bx, by + BALL_R + 4, BALL_R * 0.8, 5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    let lastTS = 0;
+    function loop(ts) {
+      const dt = ts - lastTS; lastTS = ts;
+      ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, W, H);
+      // sky
+      const sky = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+      sky.addColorStop(0, '#050510'); sky.addColorStop(1, '#0d1a40');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, HORIZON_Y);
+
+      update(dt);
+      drawRoad();
+      drawBall();
+
+      // HUD
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px Segoe UI';
+      ctx.textAlign = 'left';
+      ctx.fillText('Score: ' + Math.floor(score), 14, 34);
+      ctx.textAlign = 'right';
+      ctx.fillText('Best: ' + Math.floor(hiScore), W - 14, 34);
+
+      if (state === 'idle') {
+        ctx.fillStyle = '#0f0f1a99';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 30px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.fillText('Slope ⚽', W / 2, H / 2 - 30);
+        ctx.font = '18px Segoe UI';
+        ctx.fillStyle = '#ccc';
+        ctx.fillText('Press ← → or A/D to start!', W / 2, H / 2 + 10);
+      }
+      if (state === 'dead') {
+        ctx.fillStyle = '#0f0f1a99';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#ff6b6b';
+        ctx.font = 'bold 34px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.fillText('💀 You Fell!', W / 2, H / 2 - 40);
+        ctx.fillStyle = '#fff';
+        ctx.font = '22px Segoe UI';
+        ctx.fillText('Score: ' + Math.floor(score), W / 2, H / 2 + 2);
+        ctx.fillStyle = '#ffd93d';
+        ctx.fillText('Best: ' + Math.floor(hiScore), W / 2, H / 2 + 34);
+        ctx.fillStyle = '#aaa';
+        ctx.font = '16px Segoe UI';
+        ctx.fillText('Press any key to play again', W / 2, H / 2 + 68);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    reset();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

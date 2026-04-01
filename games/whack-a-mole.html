@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🐹 Whack-a-Mole</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    #info { display: flex; gap: 24px; margin-bottom: 18px; font-size: 1rem; }
+    #info span { background: #1a1a2e; padding: 6px 18px; border-radius: 8px; }
+    #holes {
+      display: grid; grid-template-columns: repeat(3, 110px);
+      gap: 16px;
+    }
+    .hole {
+      width: 110px; height: 110px; border-radius: 50%;
+      background: #1a1a2e; border: 3px solid #2d2d4e;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3rem; cursor: pointer; transition: transform 0.1s, border-color 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .hole .mole { display: none; pointer-events: none; }
+    .hole.active .mole { display: block; }
+    .hole:active { transform: scale(0.93); }
+    .hole.active { border-color: #6bcb77; background: #1a2e1a; }
+    .hole.whacked { border-color: #ff6b6b; background: #2e1a1a; animation: flash 0.2s; }
+    @keyframes flash { 0%,100%{background:#2e1a1a} 50%{background:#ff6b6b44} }
+    button { margin-top: 18px; background: #4d96ff; color: #fff; border: none; padding: 10px 30px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #2979d8; }
+    #bar { width: 340px; height: 10px; background: #1a1a2e; border-radius: 6px; margin-top: 14px; overflow: hidden; }
+    #bar-fill { height: 100%; background: linear-gradient(90deg,#4d96ff,#6bcb77); width: 100%; transition: width 0.5s linear; border-radius: 6px; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🐹 Whack-a-Mole</h1>
+  <div id="info">
+    <span>Score: <b id="score">0</b></span>
+    <span>Missed: <b id="missed">0</b></span>
+    <span>Time: <b id="timer">30</b>s</span>
+  </div>
+  <div id="holes"></div>
+  <div id="bar"><div id="bar-fill"></div></div>
+  <button id="btn" onclick="startGame()">Start Game</button>
+
+  <script>
+    const MOLES = ['🐹','🐭','🐰','🦔'];
+    const BAD   = ['💣','👹'];
+    const TOTAL_TIME = 30;
+    const HOLES = 9;
+
+    let score, missed, timeLeft, running, holeTimes, mainTimer, holes;
+
+    function buildHoles() {
+      const container = document.getElementById('holes');
+      container.innerHTML = '';
+      holes = [];
+      for (let i = 0; i < HOLES; i++) {
+        const div = document.createElement('div');
+        div.className = 'hole';
+        div.innerHTML = '<span class="mole">🐹</span>';
+        div.addEventListener('click', () => whack(i, div));
+        container.appendChild(div);
+        holes.push(div);
+      }
+    }
+
+    function startGame() {
+      buildHoles();
+      score = 0; missed = 0; timeLeft = TOTAL_TIME; running = true;
+      document.getElementById('score').textContent = 0;
+      document.getElementById('missed').textContent = 0;
+      document.getElementById('timer').textContent = TOTAL_TIME;
+      document.getElementById('bar-fill').style.width = '100%';
+      document.getElementById('btn').textContent = 'Restart';
+      holeTimes = Array(HOLES).fill(null);
+
+      clearInterval(mainTimer);
+      mainTimer = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').textContent = timeLeft;
+        document.getElementById('bar-fill').style.width = (timeLeft / TOTAL_TIME * 100) + '%';
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+
+      popMoles();
+    }
+
+    function popMoles() {
+      if (!running) return;
+      holes.forEach((hole, i) => {
+        if (!hole.classList.contains('active') && !hole.classList.contains('whacked')) {
+          if (Math.random() < 0.35) showMole(i, hole);
+        }
+      });
+      setTimeout(popMoles, 500);
+    }
+
+    function showMole(i, hole) {
+      const isBad = Math.random() < 0.2;
+      const emoji = isBad ? BAD[Math.floor(Math.random() * BAD.length)]
+                           : MOLES[Math.floor(Math.random() * MOLES.length)];
+      hole.querySelector('.mole').textContent = emoji;
+      hole.dataset.bad = isBad ? '1' : '';
+      hole.classList.add('active');
+      const dur = 800 + Math.random() * 600;
+      holeTimes[i] = setTimeout(() => {
+        if (hole.classList.contains('active')) {
+          hole.classList.remove('active');
+          if (!isBad) { missed++; document.getElementById('missed').textContent = missed; }
+        }
+      }, dur);
+    }
+
+    function whack(i, hole) {
+      if (!running || !hole.classList.contains('active')) return;
+      clearTimeout(holeTimes[i]);
+      const bad = hole.dataset.bad === '1';
+      hole.classList.remove('active');
+      hole.classList.add('whacked');
+      setTimeout(() => hole.classList.remove('whacked'), 300);
+      if (bad) { score = Math.max(0, score - 5); }
+      else { score += 10; }
+      document.getElementById('score').textContent = score;
+    }
+
+    function endGame() {
+      running = false;
+      clearInterval(mainTimer);
+      holes.forEach(h => { clearTimeout(holeTimes[holes.indexOf(h)]); h.classList.remove('active'); });
+      document.getElementById('btn').textContent = `Game Over! Score: ${score} — Play Again`;
+    }
+
+    buildHoles();
+  </script>
+</body>
+</html>
