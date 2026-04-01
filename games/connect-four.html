@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🔴 Connect Four</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 6px; }
+    #turn { color: #aaa; font-size: 0.95rem; margin-bottom: 14px; min-height: 22px; }
+    #grid-wrap { position: relative; }
+    #preview { display: flex; gap: 8px; margin-bottom: 6px; }
+    .prev-slot { width: 60px; height: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .prev-dot { width: 22px; height: 22px; border-radius: 50%; opacity: 0; transition: opacity 0.15s; }
+    #board {
+      display: grid; grid-template-columns: repeat(7, 60px);
+      grid-template-rows: repeat(6, 60px); gap: 8px;
+      background: #1a2a6e; padding: 12px; border-radius: 14px;
+    }
+    .hole {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: #0f0f1a; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .hole.red  { background: #ff4444; box-shadow: inset 0 -4px 8px rgba(0,0,0,0.4); }
+    .hole.yel  { background: #ffd93d; box-shadow: inset 0 -4px 8px rgba(0,0,0,0.4); }
+    .hole.win  { animation: bounce 0.4s infinite alternate; }
+    @keyframes bounce { from{box-shadow:inset 0 -4px 8px rgba(0,0,0,0.4)} to{box-shadow:0 0 20px #fff9} }
+    #msg { margin-top: 16px; font-size: 1.3rem; color: #ffd93d; min-height: 30px; }
+    #mode { margin-bottom: 14px; display: flex; gap: 10px; }
+    #mode button { background: #1a1a2e; color: #fff; border: 2px solid #4d96ff44; padding: 7px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+    #mode button.active { background: #4d96ff22; border-color: #4d96ff; }
+    button.new { margin-top: 12px; background: #4d96ff; color: #fff; border: none; padding: 9px 26px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button.new:hover { background: #2979d8; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🔴 Connect Four</h1>
+  <div id="mode">
+    <button id="mVsAI" class="active" onclick="setMode('ai')">vs AI</button>
+    <button id="mVsP"  onclick="setMode('2p')">2 Players</button>
+  </div>
+  <p id="turn"></p>
+  <div id="grid-wrap">
+    <div id="preview"></div>
+    <div id="board"></div>
+  </div>
+  <div id="msg"></div>
+  <button class="new" onclick="newGame()">New Game</button>
+
+  <script>
+    const ROWS = 6, COLS = 7;
+    let grid, turn, over, mode = 'ai', hovered = -1;
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('mVsAI').className = m === 'ai' ? 'active' : '';
+      document.getElementById('mVsP').className  = m === '2p'  ? 'active' : '';
+      newGame();
+    }
+
+    function newGame() {
+      grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+      turn = 1; over = false; hovered = -1;
+      document.getElementById('msg').textContent = '';
+      render();
+      setTurnText();
+    }
+
+    function setTurnText() {
+      const who = mode === 'ai' ? (turn === 1 ? '🔴 Your turn (Red)' : '🟡 AI thinking…') : (turn === 1 ? '🔴 Red\'s turn' : '🟡 Yellow\'s turn');
+      document.getElementById('turn').textContent = over ? '' : who;
+    }
+
+    function dropCol(col) {
+      if (over) return;
+      if (mode === 'ai' && turn === 2) return;
+      drop(col);
+    }
+
+    function drop(col) {
+      let row = -1;
+      for (let r = ROWS - 1; r >= 0; r--) { if (!grid[r][col]) { row = r; break; } }
+      if (row === -1) return;
+      grid[row][col] = turn;
+      render();
+      const w = checkWin();
+      if (w) { highlightWin(w); endGame(turn === 1 ? '🔴 Red wins!' : '🟡 Yellow wins!'); return; }
+      if (grid[0].every((_, c) => grid[0][c])) { endGame('Draw!'); return; }
+      turn = 3 - turn;
+      setTurnText();
+      if (mode === 'ai' && turn === 2) setTimeout(aiMove, 400);
+    }
+
+    function aiMove() {
+      // Try to win, then block, then center, then random
+      const move = bestMove();
+      drop(move);
+    }
+
+    function bestMove() {
+      // Win
+      for (let c = 0; c < COLS; c++) if (canDrop(c) && wouldWin(c, 2)) return c;
+      // Block
+      for (let c = 0; c < COLS; c++) if (canDrop(c) && wouldWin(c, 1)) return c;
+      // Center preference
+      const pref = [3,2,4,1,5,0,6];
+      for (const c of pref) if (canDrop(c)) return c;
+      return 0;
+    }
+
+    function canDrop(col) { return grid[0][col] === 0; }
+
+    function wouldWin(col, player) {
+      const g = grid.map(r => [...r]);
+      for (let r = ROWS - 1; r >= 0; r--) { if (!g[r][col]) { g[r][col] = player; break; } }
+      return !!checkWinGrid(g);
+    }
+
+    function checkWin() { return checkWinGrid(grid); }
+
+    function checkWinGrid(g) {
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+          const v = g[r][c]; if (!v) continue;
+          const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+          for (const [dr, dc] of dirs) {
+            const cells = [[r,c]];
+            for (let i = 1; i < 4; i++) {
+              const nr = r + dr * i, nc = c + dc * i;
+              if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || g[nr][nc] !== v) break;
+              cells.push([nr, nc]);
+            }
+            if (cells.length === 4) return cells;
+          }
+        }
+      return null;
+    }
+
+    function highlightWin(cells) {
+      const board = document.getElementById('board');
+      cells.forEach(([r, c]) => board.children[r * COLS + c].classList.add('win'));
+    }
+
+    function endGame(msg) {
+      over = true;
+      document.getElementById('msg').textContent = msg;
+      document.getElementById('turn').textContent = '';
+    }
+
+    function render() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+          const hole = document.createElement('div');
+          hole.className = 'hole';
+          if (grid[r][c] === 1) hole.classList.add('red');
+          else if (grid[r][c] === 2) hole.classList.add('yel');
+          board.appendChild(hole);
+        }
+
+      // preview row
+      const prev = document.getElementById('preview');
+      prev.innerHTML = '';
+      for (let c = 0; c < COLS; c++) {
+        const slot = document.createElement('div');
+        slot.className = 'prev-slot';
+        const dot = document.createElement('div');
+        dot.className = 'prev-dot';
+        dot.style.background = turn === 1 ? '#ff4444' : '#ffd93d';
+        dot.style.opacity = (hovered === c && !over && !(mode === 'ai' && turn === 2)) ? '1' : '0';
+        slot.appendChild(dot);
+        slot.addEventListener('mouseenter', () => { hovered = c; render(); });
+        slot.addEventListener('mouseleave', () => { hovered = -1; render(); });
+        slot.addEventListener('click', () => dropCol(c));
+        prev.appendChild(slot);
+      }
+
+      // add click listeners to columns
+      for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r < ROWS; r++) {
+          board.children[r * COLS + c].addEventListener('click', () => dropCol(c));
+        }
+      }
+    }
+
+    newGame();
+  </script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⭕ Tic-Tac-Toe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 6px; }
+    #sub { color: #888; margin-bottom: 18px; font-size: 0.95rem; }
+    #board {
+      display: grid; grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px); gap: 8px;
+    }
+    .cell {
+      width: 110px; height: 110px; background: #1a1a2e;
+      border-radius: 12px; display: flex; align-items: center;
+      justify-content: center; font-size: 3.5rem; cursor: pointer;
+      border: 2px solid #2d2d4e; transition: background 0.15s, transform 0.1s;
+    }
+    .cell:hover:not(.taken) { background: #1e2a44; transform: scale(1.04); }
+    .cell.taken { cursor: default; }
+    .cell.win { background: #1a3a1a; border-color: #6bcb77; animation: pulse 0.5s; }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+    #msg { margin-top: 18px; font-size: 1.3rem; color: #ffd93d; min-height: 30px; text-align: center; }
+    #scores { display: flex; gap: 24px; margin-top: 14px; }
+    .sc { background: #1a1a2e; border-radius: 8px; padding: 8px 20px; text-align: center; }
+    .sc label { font-size: 0.75rem; color: #888; display: block; }
+    .sc b { font-size: 1.3rem; }
+    .x-color { color: #4d96ff; }
+    .o-color { color: #ff6b6b; }
+    .d-color { color: #aaa; }
+    #mode { margin-bottom: 16px; display: flex; gap: 10px; }
+    #mode button { background: #1a1a2e; color: #fff; border: 2px solid #4d96ff44; padding: 7px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+    #mode button.active { background: #4d96ff22; border-color: #4d96ff; }
+    button.new { margin-top: 14px; background: #4d96ff; color: #fff; border: none; padding: 9px 26px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button.new:hover { background: #2979d8; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>⭕ Tic-Tac-Toe</h1>
+  <p id="sub">You are X — make three in a row!</p>
+  <div id="mode">
+    <button id="mVsAI" class="active" onclick="setMode('ai')">vs AI</button>
+    <button id="mVsP" onclick="setMode('2p')">2 Players</button>
+  </div>
+  <div id="board"></div>
+  <div id="msg"></div>
+  <div id="scores">
+    <div class="sc"><label>X Wins</label><b id="xw" class="x-color">0</b></div>
+    <div class="sc"><label>Draws</label><b id="dw" class="d-color">0</b></div>
+    <div class="sc"><label>O Wins</label><b id="ow" class="o-color">0</b></div>
+  </div>
+  <button class="new" onclick="newGame()">New Game</button>
+
+  <script>
+    const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    let cells, turn, over, mode = 'ai', scores = {x:0,d:0,o:0};
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('mVsAI').className = m === 'ai' ? 'active' : '';
+      document.getElementById('mVsP').className  = m === '2p'  ? 'active' : '';
+      document.getElementById('sub').textContent  = m === 'ai' ? 'You are X — make three in a row!' : 'X goes first!';
+      newGame();
+    }
+
+    function newGame() {
+      cells = Array(9).fill(''); turn = 'X'; over = false;
+      document.getElementById('msg').textContent = '';
+      render();
+    }
+
+    function render() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      cells.forEach((v, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell' + (v ? ' taken' : '');
+        cell.textContent = v === 'X' ? '✕' : v === 'O' ? '○' : '';
+        cell.style.color = v === 'X' ? '#4d96ff' : '#ff6b6b';
+        if (!v && !over) cell.addEventListener('click', () => play(i));
+        board.appendChild(cell);
+      });
+    }
+
+    function play(i) {
+      if (over || cells[i]) return;
+      cells[i] = turn;
+      render();
+      const w = checkWin();
+      if (w) { highlight(w); endGame(turn + ' wins!', turn.toLowerCase()); return; }
+      if (cells.every(v => v)) { endGame('Draw!', 'd'); return; }
+      turn = turn === 'X' ? 'O' : 'X';
+      if (mode === 'ai' && turn === 'O') setTimeout(aiMove, 350);
+    }
+
+    function aiMove() {
+      const move = minimax(cells, 'O').index;
+      play(move);
+    }
+
+    function minimax(board, player) {
+      const avail = board.map((v, i) => v ? null : i).filter(i => i !== null);
+      const w = checkWinBoard(board);
+      if (w === 'X') return { score: -10 };
+      if (w === 'O') return { score: 10 };
+      if (!avail.length) return { score: 0 };
+      const moves = avail.map(i => {
+        const b = [...board]; b[i] = player;
+        const s = minimax(b, player === 'O' ? 'X' : 'O').score;
+        return { index: i, score: s };
+      });
+      return player === 'O'
+        ? moves.reduce((a, b) => b.score > a.score ? b : a)
+        : moves.reduce((a, b) => b.score < a.score ? b : a);
+    }
+
+    function checkWin() { return checkWinBoard(cells); }
+
+    function checkWinBoard(board) {
+      for (const [a, b, c] of WINS)
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+      return null;
+    }
+
+    function highlight(winner) {
+      const board = document.getElementById('board');
+      for (const [a, b, c] of WINS)
+        if (cells[a] === winner && cells[a] === cells[b] && cells[a] === cells[c]) {
+          [a, b, c].forEach(i => board.children[i].classList.add('win'));
+        }
+    }
+
+    function endGame(msg, key) {
+      over = true;
+      document.getElementById('msg').textContent = msg;
+      scores[key]++;
+      document.getElementById('xw').textContent = scores.x;
+      document.getElementById('dw').textContent = scores.d;
+      document.getElementById('ow').textContent = scores.o;
+    }
+
+    newGame();
+  </script>
+</body>
+</html>

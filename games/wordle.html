@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🟩 Wordle</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; min-height: 100vh; padding: 20px 0 60px;
+      font-family: 'Segoe UI', sans-serif; color: #fff;
+    }
+    h1 { font-size: 2rem; margin-bottom: 4px; }
+    #sub { color: #888; font-size: 0.9rem; margin-bottom: 16px; }
+    #board { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .row { display: flex; gap: 6px; }
+    .tile {
+      width: 56px; height: 56px; border: 2px solid #3d3d5e;
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; font-weight: bold; text-transform: uppercase;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .tile.filled { border-color: #888; }
+    .tile.correct { background: #538d4e; border-color: #538d4e; }
+    .tile.present { background: #b59f3b; border-color: #b59f3b; }
+    .tile.absent  { background: #3a3a3a; border-color: #3a3a3a; }
+    .tile.reveal  { animation: flip 0.5s ease; }
+    @keyframes flip { 0%{transform:scaleY(1)} 50%{transform:scaleY(0)} 100%{transform:scaleY(1)} }
+    .tile.shake { animation: shake 0.4s; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+    #keyboard { display: flex; flex-direction: column; gap: 6px; }
+    .krow { display: flex; gap: 5px; justify-content: center; }
+    .key {
+      padding: 14px 10px; border-radius: 6px; background: #3d3d5e;
+      font-size: 0.85rem; font-weight: bold; cursor: pointer; border: none;
+      color: #fff; min-width: 36px; text-align: center;
+      transition: background 0.2s;
+    }
+    .key.wide { min-width: 54px; font-size: 0.75rem; }
+    .key.correct { background: #538d4e; }
+    .key.present { background: #b59f3b; }
+    .key.absent  { background: #3a3a3a; }
+    #msg { height: 30px; font-size: 1.1rem; color: #ffd93d; text-align: center; margin-bottom: 8px; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+    button.new { margin-top: 10px; background: #4d96ff; color: #fff; border: none; padding: 9px 26px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button.new:hover { background: #2979d8; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🟩 Wordle</h1>
+  <p id="sub">Guess the 5-letter word in 6 tries!</p>
+  <div id="msg"></div>
+  <div id="board"></div>
+  <div id="keyboard"></div>
+  <button class="new" onclick="newGame()">New Word</button>
+
+  <script>
+    const WORDS = [
+      'crane','slate','raise','stare','crate','trace','least','react','leapt',
+      'brave','cloud','plant','groan','twist','blend','flick','shock','brown',
+      'clamp','snare','drape','flame','glare','grace','grave','graze','haste',
+      'knave','lance','large','lapse','laser','later','latch','layer','lilac',
+      'phase','place','plane','plate','plaze','plaza','plume','polar','price',
+      'pride','prime','print','prism','prize','probe','prose','proud','prove',
+      'shard','shark','sharp','shave','shawl','shear','sheep','sheer','shelf',
+      'blast','bland','blank','blare','blaze','bleak','bleed','bless','blind',
+      'block','blood','bloom','blown','blues','bluff','blunt','blurb','blurt',
+      'brush','brace','brain','brand','brash','brass','brawl','bread','break',
+      'breed','brine','brink','brisk','broad','broil','brood','broth','brows',
+      'chess','chest','chief','child','chill','chimp','chunk','civic','civil',
+      'claim','clang','clash','clasp','class','clean','clear','cleat','clerk',
+      'cleft','cliff','cling','clink','cloak','clock','clone','close','cloth',
+      'couch','cough','could','count','court','cover','craft','crash','crazy',
+      'crest','crime','crimp','crisp','cross','crowd','crown','cruel','crush',
+      'dance','death','debut','delta','dense','depot','depth','devil','digit',
+      'dirge','disco','ditch','dizzy','dodge','dogma','doing','doubt','dough',
+      'draft','drain','drama','drank','drawl','dream','dregs','dress','drift',
+      'drink','drive','drool','droop','drove','drown','dryer','duchy','dunes',
+      'dwarf','dying','eagle','early','earth','easel','eight','elbow','elite',
+      'empty','enemy','enjoy','enter','entry','envoy','equal','error','essay',
+      'evade','event','evict','evoke','exact','exalt','excel','exile','exist',
+      'extra','fable','facet','faith','false','fancy','fatal','fault','feast',
+      'feral','fetch','fever','fiend','fifth','fight','final','fixed','flair',
+      'flash','flask','flair','flaw','flesh','flick','fling','flint','flirt',
+      'float','flock','flood','floor','floss','flour','flown','flute','focus',
+      'foray','forge','forgo','forth','found','frame','frank','fraud','freak',
+      'fresh','front','frost','froth','froze','fruit','fully','funny','futon',
+      'gauze','gaudy','gavel','gecko','geode','ghost','girth','given','gizmo',
+      'gland','glare','glide','glint','globe','gloom','gloss','glove','gnash',
+      'goose','gorge','gouge','gourd','grain','gramp','grand','grant','grasp',
+      'graze','greed','greet','grind','gripe','groan','groom','grope','group',
+      'growl','gruel','gruff','grunt','guava','guard','guess','guest','guide',
+      'guild','guile','guise','gulch','gully','gumbo','gusto','gypsy','haiku',
+      'halve','happy','hardy','hatch','haunt','haven','havoc','heist','hence',
+      'heron','hexer','hiked','hitch','hoard','hobby','holly','homer','honey',
+      'honor','horde','hotel','hound','house','hover','human','humor','husky',
+      'hyena','hyper','igloo','image','imply','inbox','infer','ingot','inner',
+      'input','inter','intro','ionic','irate','irony','ivory','jaunt','jazzy',
+      'jewel','joust','judge','juice','juicy','jumbo','knack','kneel','knife',
+      'knock','knoll','known','koala','kudos','laden','ladle','lanky','lapel',
+      'lemon','level','light','lilac','limit','linen','liver','livid','llama',
+      'lodge','lofty','logic','loner','loopy','lotus','lousy','lover','lower',
+      'loyal','lucid','lumpy','lunar','lunch','lusty','lymph','lyric','magic',
+      'maize','major','maker','manor','maple','march','match','maybe','mayor',
+      'medal','mercy','merit','merry','metal','meter','midst','might','mimic',
+      'minor','minus','mirth','miser','misty','mitre','mixer','modal','model',
+      'modem','money','month','moose','moral','mount','mourn','mouth','movie',
+      'muddy','mummy','mural','mushy','music','muted','naive','nanny','nasal',
+      'nerve','never','niche','night','ninja','noble','noise','north','notch',
+      'noted','novel','nudge','nurse','nymph','octet','offal','olive','optic',
+      'orbit','organ','other','otter','outdo','outer','oxide','ozone','pager',
+      'panic','parka','party','pasta','patch','pause','payee','peace','peach',
+      'pearl','pedal','penny','peony','perch','perky','pesky','petty','piano',
+      'pilot','pinch','piney','pixie','pizza','pixel','pixel','plain','plank',
+      'plead','pleat','pluck','plume','plush','poach','point','poise','poker',
+      'posse','pouch','power','prank','prawn','preach','press','pricy','primp',
+      'prink','prior','privy','proxy','psalm','pubic','punch','pupil','purse',
+      'pushy','pygmy','qualm','queen','query','quest','queue','quirk','quota',
+      'quote','rabbi','radar','radio','rainy','rally','ranch','range','rapid',
+      'raspy','raven','reach','ready','realm','rebel','rebus','recut','reedy',
+      'refer','reign','relax','relay','relic','repay','repel','repin','rerun',
+      'resin','retch','retro','retry','revel','rider','ridge','rifle','right',
+      'rigid','ripen','risky','rivet','robot','rocky','rodeo','rogue','roost',
+      'rouge','rough','round','route','rowdy','ruler','rumba','rumen','rupee',
+      'salsa','salty','salvo','sandy','sauce','sauna','saute','savor','savvy',
+      'scald','scalp','scaly','scamp','scant','scare','scene','scone','scoop',
+      'scope','score','scorn','scout','scowl','scram','scrap','scrub','seize',
+      'serve','setup','seven','sewer','sixty','sixth','sixty','skill','skimp',
+      'slain','slant','slash','slave','sleek','sleet','slept','slick','slide',
+      'slime','sling','slink','slope','slosh','sloth','slump','slung','slunk',
+      'slurp','slush','slyly','smart','smell','smile','smirk','smoky','snack',
+      'snail','snake','snaky','snare','sneak','snide','sniff','snore','snort',
+      'solar','solve','sonic','sorry','south','space','spare','spark','spawn',
+      'speak','spear','speck','speed','spend','spice','spiel','spike','spine',
+      'spiny','spire','spite','splat','split','spoke','spook','spoon','spore',
+      'sport','spout','spray','spree','sprig','sprint','squad','squat','squid',
+      'stain','stall','stamp','stand','stank','stark','start','stash','steal',
+      'steam','steel','steep','steer','stern','stick','stiff','still','sting',
+      'stink','stock','stomp','stone','stood','stool','stoop','store','storm',
+      'story','stoic','strap','stray','strip','strut','stuck','stump','stunk',
+      'stunt','style','suave','sugar','suite','sunny','super','surge','swamp',
+      'swath','swear','sweat','sweep','sweet','swept','swift','swill','swipe',
+      'swirl','swoop','sword','swore','sworn','syrup','tabby','table','taffy',
+      'tapir','taunt','teach','tease','tempo','tense','tenth','tepid','terse',
+      'theft','their','theme','there','thick','thing','think','third','thorn',
+      'those','three','threw','throw','thrum','thumb','thump','tiger','tilde',
+      'tinge','tipsy','tired','tithe','title','toast','today','token','topaz',
+      'topic','torch','total','touch','tough','towel','toxic','toxic','track',
+      'trail','train','trait','tramp','trawl','tread','treat','trend','trial',
+      'tribe','tried','trite','troll','troop','troth','trout','trove','truck',
+      'truly','trump','trunk','truss','trust','truth','tulip','tuner','tunic',
+      'tuple','tutor','twang','tweak','tweed','twerp','twice','twine','twirl',
+      'twitch','ultra','uncle','under','undue','unify','union','until','unzip',
+      'upset','usher','usurp','utter','uvula','vague','valid','valor','valve',
+      'vapid','vault','vaunt','verge','verse','vicar','vigor','villa','viola',
+      'viper','viral','vivid','vixen','visor','vocal','vodka','voila','vouch',
+      'waged','waltz','wanes','watch','water','weary','weave','wedge','weedy',
+      'weird','whale','whack','wheat','wheel','whelp','where','which','while',
+      'whiff','whirl','which','whisp','white','whole','wider','width','wield',
+      'wired','witch','witty','woman','women','wooly','world','wormy','wound',
+      'wrath','wrist','wrong','yacht','yearn','yield','young','youth','zebra',
+      'zilch','zonal','zones','zoned',
+    ].filter(w => w.length === 5);
+
+    let target, current, guesses, over;
+
+    function newGame() {
+      target = WORDS[Math.floor(Math.random() * WORDS.length)].toUpperCase();
+      current = ''; guesses = []; over = false;
+      document.getElementById('msg').textContent = '';
+      buildBoard(); buildKeyboard();
+    }
+
+    function buildBoard() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      for (let r = 0; r < 6; r++) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        for (let c = 0; c < 5; c++) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          tile.id = `t${r}${c}`;
+          row.appendChild(tile);
+        }
+        board.appendChild(row);
+      }
+    }
+
+    const KEYBOARD_ROWS = [
+      ['Q','W','E','R','T','Y','U','I','O','P'],
+      ['A','S','D','F','G','H','J','K','L'],
+      ['Enter','Z','X','C','V','B','N','M','⌫'],
+    ];
+    const keyStates = {};
+
+    function buildKeyboard() {
+      for (const k in keyStates) delete keyStates[k];
+      const kbd = document.getElementById('keyboard');
+      kbd.innerHTML = '';
+      KEYBOARD_ROWS.forEach(row => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'krow';
+        row.forEach(key => {
+          const btn = document.createElement('button');
+          btn.className = 'key' + (key.length > 1 ? ' wide' : '');
+          btn.textContent = key;
+          btn.id = 'k' + key;
+          btn.addEventListener('click', () => handleKey(key));
+          rowEl.appendChild(btn);
+        });
+        kbd.appendChild(rowEl);
+      });
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Enter') handleKey('Enter');
+      else if (e.key === 'Backspace') handleKey('⌫');
+      else if (/^[a-zA-Z]$/.test(e.key)) handleKey(e.key.toUpperCase());
+    });
+
+    function handleKey(key) {
+      if (over) return;
+      if (key === '⌫') {
+        current = current.slice(0, -1);
+      } else if (key === 'Enter') {
+        submit();
+        return;
+      } else if (current.length < 5) {
+        current += key;
+      }
+      updateCurrentRow();
+    }
+
+    function updateCurrentRow() {
+      const r = guesses.length;
+      for (let c = 0; c < 5; c++) {
+        const tile = document.getElementById(`t${r}${c}`);
+        tile.textContent = current[c] || '';
+        tile.className = 'tile' + (current[c] ? ' filled' : '');
+      }
+    }
+
+    function submit() {
+      if (current.length < 5) { flash(); return; }
+      if (!WORDS.includes(current.toLowerCase())) {
+        document.getElementById('msg').textContent = 'Not in word list!';
+        flash();
+        return;
+      }
+      document.getElementById('msg').textContent = '';
+      const r = guesses.length;
+      const result = score(current);
+      guesses.push({ word: current, result });
+
+      // reveal with delay
+      result.forEach((state, c) => {
+        setTimeout(() => {
+          const tile = document.getElementById(`t${r}${c}`);
+          tile.classList.add('reveal');
+          tile.className = `tile reveal ${state}`;
+          // update keyboard
+          const cur = keyStates[current[c]];
+          if (!cur || cur === 'absent' || (cur === 'present' && state === 'correct')) {
+            keyStates[current[c]] = state;
+            const kBtn = document.getElementById('k' + current[c]);
+            if (kBtn) { kBtn.className = `key ${state}`; }
+          }
+        }, c * 100);
+      });
+
+      setTimeout(() => {
+        if (current === target) {
+          const msgs = ['Genius!','Magnificent!','Impressive!','Splendid!','Great!','Phew!'];
+          document.getElementById('msg').textContent = msgs[Math.min(r, 5)] + ' 🎉';
+          over = true;
+        } else if (guesses.length === 6) {
+          document.getElementById('msg').textContent = `Answer: ${target}`;
+          over = true;
+        }
+        current = '';
+      }, 600);
+    }
+
+    function score(word) {
+      const result = Array(5).fill('absent');
+      const remaining = target.split('');
+      // correct pass
+      for (let i = 0; i < 5; i++) {
+        if (word[i] === target[i]) { result[i] = 'correct'; remaining[i] = null; }
+      }
+      // present pass
+      for (let i = 0; i < 5; i++) {
+        if (result[i] === 'correct') continue;
+        const idx = remaining.indexOf(word[i]);
+        if (idx !== -1) { result[i] = 'present'; remaining[idx] = null; }
+      }
+      return result;
+    }
+
+    function flash() {
+      const r = guesses.length;
+      for (let c = 0; c < 5; c++) {
+        const tile = document.getElementById(`t${r}${c}`);
+        tile.classList.add('shake');
+        setTimeout(() => tile.classList.remove('shake'), 400);
+      }
+    }
+
+    newGame();
+  </script>
+</body>
+</html>

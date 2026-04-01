@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>👻 Pac-Man</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    #info { display: flex; gap: 26px; margin-bottom: 10px; font-size: 1rem; }
+    #info span { background: #1a1a2e; padding: 5px 16px; border-radius: 8px; }
+    canvas { border: 3px solid #4d96ff; border-radius: 10px; }
+    #hint { margin-top: 10px; color: #888; font-size: 0.9rem; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>👻 Pac-Man</h1>
+  <div id="info">
+    <span>Score: <b id="score">0</b></span>
+    <span>Lives: <b id="lives">3</b></span>
+    <span>Level: <b id="level">1</b></span>
+  </div>
+  <canvas id="c"></canvas>
+  <p id="hint">Arrow keys or WASD to move. Eat all dots!</p>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const CELL = 22;
+
+    // 0=empty,1=wall,2=dot,3=power,4=empty(eaten)
+    const BASE_MAP = [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+      [1,3,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,3,1],
+      [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+      [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+      [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
+      [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
+      [1,1,1,1,2,1,1,1,0,0,0,1,1,1,2,1,1,1,1],
+      [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
+      [1,1,1,1,2,1,0,1,1,0,1,1,0,1,2,1,1,1,1],
+      [0,0,0,0,2,0,0,1,0,0,0,1,0,0,2,0,0,0,0],
+      [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
+      [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
+      [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
+      [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+      [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+      [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
+      [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
+      [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
+      [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+      [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    ];
+
+    const ROWS = BASE_MAP.length, COLS = BASE_MAP[0].length;
+    canvas.width = COLS * CELL; canvas.height = ROWS * CELL;
+
+    const GHOST_COLORS = ['#ff6b6b','#ffb347','#87ceeb','#ff69b4'];
+
+    let map, pac, ghosts, score, lives, level, powered, powerTimer, state, animId, mouthOpen, frameCount;
+
+    function cloneMap() { return BASE_MAP.map(r => [...r]); }
+
+    function countDots(m) { return m.flat().filter(v => v === 2 || v === 3).length; }
+
+    function initGhosts() {
+      return GHOST_COLORS.map((color, i) => ({
+        x: 9, y: 10, tx: 9 + (i % 2), ty: 9 + Math.floor(i / 2),
+        color, dir: { x: 0, y: 0 }, scared: false, moveCD: 0,
+      }));
+    }
+
+    function startGame() {
+      map = cloneMap(); score = 0; lives = 3; level = 1; state = 'playing';
+      powered = false; powerTimer = 0; frameCount = 0; mouthOpen = 0;
+      pac = { x: 9, y: 16, dir: { x: 0, y: 0 }, nextDir: { x: 0, y: 0 }, angle: 0 };
+      ghosts = initGhosts();
+      updateUI();
+    }
+
+    function updateUI() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('lives').textContent = lives;
+      document.getElementById('level').textContent = level;
+    }
+
+    const keys = {};
+    document.addEventListener('keydown', e => {
+      const map2 = {
+        ArrowLeft: {x:-1,y:0}, a: {x:-1,y:0}, A: {x:-1,y:0},
+        ArrowRight:{x:1,y:0},  d: {x:1,y:0},  D: {x:1,y:0},
+        ArrowUp:   {x:0,y:-1}, w: {x:0,y:-1}, W: {x:0,y:-1},
+        ArrowDown: {x:0,y:1},  s: {x:0,y:1},  S: {x:0,y:1},
+      };
+      if (map2[e.key]) {
+        e.preventDefault();
+        pac.nextDir = map2[e.key];
+        if (state !== 'playing') { startGame(); }
+      }
+    });
+
+    function canMove(x, y) {
+      if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+      return map[y][x] !== 1;
+    }
+
+    let pacCD = 0, ghostMoveCD = 0;
+
+    function update() {
+      frameCount++;
+      mouthOpen = Math.abs(Math.sin(frameCount * 0.2));
+      if (state !== 'playing') return;
+
+      pacCD++;
+      const PAC_SPEED = Math.max(3, 5 - level);
+      if (pacCD >= PAC_SPEED) {
+        pacCD = 0;
+        const nd = pac.nextDir, pd = pac.dir;
+        const nx = pac.x + nd.x, ny = pac.y + nd.y;
+        const px = pac.x + pd.x, py = pac.y + pd.y;
+        if (nd.x || nd.y) {
+          if (canMove(nx, ny)) { pac.dir = nd; pac.x = nx; pac.y = ny; }
+          else if (canMove(px, py)) { pac.x = px; pac.y = py; }
+        } else if (canMove(px, py)) { pac.x = px; pac.y = py; }
+
+        // wrap tunnel
+        pac.x = (pac.x + COLS) % COLS; pac.y = (pac.y + ROWS) % ROWS;
+
+        // eat
+        const cell = map[pac.y][pac.x];
+        if (cell === 2) { map[pac.y][pac.x] = 4; score += 10; }
+        else if (cell === 3) { map[pac.y][pac.x] = 4; score += 50; powered = true; powerTimer = 150; ghosts.forEach(g => g.scared = true); }
+        updateUI();
+        if (countDots(map) === 0) { level++; map = cloneMap(); updateUI(); }
+      }
+
+      // power timer
+      if (powered) {
+        powerTimer--;
+        if (powerTimer <= 0) { powered = false; ghosts.forEach(g => g.scared = false); }
+      }
+
+      // ghosts
+      ghostMoveCD++;
+      const GHOST_SPEED = Math.max(6, 10 - level);
+      if (ghostMoveCD >= GHOST_SPEED) {
+        ghostMoveCD = 0;
+        ghosts.forEach(g => {
+          const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+          const validDirs = dirs.filter(d => canMove(g.x + d.x, g.y + d.y) && !(d.x === -g.dir.x && d.y === -g.dir.y));
+          if (!validDirs.length) {
+            const all = dirs.filter(d => canMove(g.x + d.x, g.y + d.y));
+            if (all.length) g.dir = all[Math.floor(Math.random() * all.length)];
+          } else if (Math.random() < 0.7 && !g.scared) {
+            // chase pac
+            validDirs.sort((a, b) => {
+              const da = Math.abs(g.x + a.x - pac.x) + Math.abs(g.y + a.y - pac.y);
+              const db = Math.abs(g.x + b.x - pac.x) + Math.abs(g.y + b.y - pac.y);
+              return da - db;
+            });
+            g.dir = validDirs[0];
+          } else {
+            g.dir = validDirs[Math.floor(Math.random() * validDirs.length)];
+          }
+          g.x += g.dir.x; g.y += g.dir.y;
+          g.x = (g.x + COLS) % COLS; g.y = (g.y + ROWS) % ROWS;
+
+          // collision
+          if (g.x === pac.x && g.y === pac.y) {
+            if (g.scared) { g.x = 9; g.y = 10; g.scared = false; score += 200; updateUI(); }
+            else { lives--; updateUI(); if (lives <= 0) { state = 'dead'; } else { resetPositions(); } }
+          }
+        });
+      }
+    }
+
+    function resetPositions() {
+      pac.x = 9; pac.y = 16; pac.dir = {x:0,y:0}; pac.nextDir = {x:0,y:0};
+      ghosts = initGhosts();
+    }
+
+    function draw() {
+      ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // map
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+          const v = map[r][c], x = c * CELL, y = r * CELL;
+          if (v === 1) {
+            ctx.fillStyle = '#1a1a6e';
+            ctx.fillRect(x, y, CELL, CELL);
+            ctx.strokeStyle = '#4d96ff';
+            ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+          } else if (v === 2) {
+            ctx.fillStyle = '#ffd93d';
+            ctx.beginPath(); ctx.arc(x + CELL/2, y + CELL/2, 3, 0, Math.PI*2); ctx.fill();
+          } else if (v === 3) {
+            ctx.fillStyle = '#ffd93d';
+            ctx.beginPath(); ctx.arc(x + CELL/2, y + CELL/2, 7, 0, Math.PI*2); ctx.fill();
+          }
+        }
+
+      // pac-man
+      const px = pac.x * CELL + CELL/2, py = pac.y * CELL + CELL/2;
+      const angle = Math.atan2(pac.dir.y, pac.dir.x) || 0;
+      const mouth = mouthOpen * 0.35;
+      ctx.fillStyle = '#ffd93d';
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.arc(px, py, CELL/2 - 1, angle + mouth, angle + Math.PI*2 - mouth);
+      ctx.closePath(); ctx.fill();
+
+      // ghosts
+      ghosts.forEach(g => {
+        const gx = g.x * CELL, gy = g.y * CELL;
+        ctx.fillStyle = g.scared ? (powerTimer < 50 && frameCount % 10 < 5 ? '#fff' : '#4444ff') : g.color;
+        // body
+        ctx.beginPath();
+        ctx.arc(gx + CELL/2, gy + CELL/2 - 2, CELL/2 - 1, Math.PI, 0);
+        ctx.lineTo(gx + CELL - 1, gy + CELL - 2);
+        ctx.lineTo(gx + CELL - 5, gy + CELL - 6);
+        ctx.lineTo(gx + CELL/2, gy + CELL - 2);
+        ctx.lineTo(gx + 5, gy + CELL - 6);
+        ctx.lineTo(gx + 1, gy + CELL - 2);
+        ctx.closePath(); ctx.fill();
+        // eyes
+        if (!g.scared) {
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.ellipse(gx+8, gy+9, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(gx+15, gy+9, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#4d96ff';
+          ctx.beginPath(); ctx.arc(gx+9, gy+10, 2.5, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(gx+16, gy+10, 2.5, 0, Math.PI*2); ctx.fill();
+        }
+      });
+
+      // overlays
+      if (state === 'idle' || state === undefined) {
+        ctx.fillStyle = '#0f0f1acc';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffd93d';
+        ctx.font = 'bold 28px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.fillText('PAC-MAN 👻', canvas.width/2, canvas.height/2 - 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px Segoe UI';
+        ctx.fillText('Press any arrow key to start!', canvas.width/2, canvas.height/2 + 16);
+      }
+      if (state === 'dead') {
+        ctx.fillStyle = '#0f0f1acc';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ff6b6b';
+        ctx.font = 'bold 28px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER 💀', canvas.width/2, canvas.height/2 - 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '18px Segoe UI';
+        ctx.fillText('Score: ' + score, canvas.width/2, canvas.height/2 + 12);
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px Segoe UI';
+        ctx.fillText('Press arrow key to play again', canvas.width/2, canvas.height/2 + 38);
+      }
+    }
+
+    function loop() {
+      update(); draw();
+      requestAnimationFrame(loop);
+    }
+
+    state = 'idle';
+    loop();
+  </script>
+</body>
+</html>

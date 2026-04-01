@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🃏 Memory Match</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff;
+    }
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    #info { display: flex; gap: 24px; margin-bottom: 16px; font-size: 1rem; }
+    #info span { background: #1a1a2e; padding: 5px 16px; border-radius: 8px; }
+    #board {
+      display: grid; grid-template-columns: repeat(4, 90px);
+      gap: 10px;
+    }
+    .card {
+      width: 90px; height: 90px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem; cursor: pointer;
+      background: #1a1a2e; border: 2px solid #4d96ff33;
+      transition: transform 0.15s, background 0.2s;
+      perspective: 600px;
+    }
+    .card:hover:not(.matched):not(.flipped) { transform: scale(1.06); background: #1e2a44; }
+    .card.flipped { background: #1e2a44; border-color: #4d96ff; }
+    .card.matched { background: #1a3a1a; border-color: #6bcb77; cursor: default; }
+    .card .front { display: none; }
+    .card .back { display: block; font-size: 1.4rem; color: #4d96ff44; }
+    .card.flipped .front, .card.matched .front { display: block; }
+    .card.flipped .back, .card.matched .back { display: none; }
+    button { margin-top: 18px; background: #4d96ff; color: #fff; border: none; padding: 10px 30px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #2979d8; }
+    #msg { margin-top: 14px; font-size: 1.3rem; color: #ffd93d; min-height: 28px; text-align: center; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🃏 Memory Match</h1>
+  <div id="info">
+    <span>Moves: <b id="moves">0</b></span>
+    <span>Pairs: <b id="pairs">0</b>/8</span>
+    <span>Time: <b id="timer">0s</b></span>
+  </div>
+  <div id="board"></div>
+  <div id="msg"></div>
+  <button onclick="newGame()">New Game</button>
+
+  <script>
+    const EMOJIS = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐙','🦋'];
+    let moves, pairs, flipped, locked, timerID, seconds;
+
+    function newGame() {
+      clearInterval(timerID); seconds = 0; moves = 0; pairs = 0; flipped = []; locked = false;
+      document.getElementById('moves').textContent = 0;
+      document.getElementById('pairs').textContent = 0;
+      document.getElementById('timer').textContent = '0s';
+      document.getElementById('msg').textContent = '';
+      const set = EMOJIS.slice(0, 8);
+      const deck = [...set, ...set].sort(() => Math.random() - 0.5);
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      deck.forEach((emoji, i) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.emoji = emoji;
+        card.innerHTML = `<span class="front">${emoji}</span><span class="back">❓</span>`;
+        card.addEventListener('click', () => flip(card));
+        board.appendChild(card);
+      });
+      timerID = setInterval(() => {
+        seconds++;
+        document.getElementById('timer').textContent = seconds + 's';
+      }, 1000);
+    }
+
+    function flip(card) {
+      if (locked || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+      card.classList.add('flipped');
+      flipped.push(card);
+      if (flipped.length === 2) {
+        moves++;
+        document.getElementById('moves').textContent = moves;
+        locked = true;
+        const [a, b] = flipped;
+        if (a.dataset.emoji === b.dataset.emoji) {
+          a.classList.add('matched'); b.classList.add('matched');
+          flipped = []; locked = false;
+          pairs++;
+          document.getElementById('pairs').textContent = pairs;
+          if (pairs === 8) {
+            clearInterval(timerID);
+            document.getElementById('msg').textContent = `🏆 Done in ${moves} moves & ${seconds}s!`;
+          }
+        } else {
+          setTimeout(() => {
+            a.classList.remove('flipped'); b.classList.remove('flipped');
+            flipped = []; locked = false;
+          }, 900);
+        }
+      }
+    }
+
+    newGame();
+  </script>
+</body>
+</html>

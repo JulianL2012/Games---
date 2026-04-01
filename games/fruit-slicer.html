@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍉 Fruit Slicer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    #info { display: flex; gap: 22px; margin-bottom: 10px; font-size: 0.95rem; }
+    #info span { background: #1a1a2e; padding: 5px 14px; border-radius: 8px; }
+    canvas { border: 3px solid #4d96ff; border-radius: 10px; cursor: none; }
+    #hint { margin-top: 10px; color: #888; font-size: 0.85rem; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Hub</a>
+  <h1>🍉 Fruit Slicer</h1>
+  <div id="info">
+    <span>Score: <b id="score">0</b></span>
+    <span>Combo: <b id="combo">x1</b></span>
+    <span>Lives: <b id="lives">3</b></span>
+    <span>Best: <b id="best">0</b></span>
+  </div>
+  <canvas id="c" width="520" height="460"></canvas>
+  <p id="hint">Slice fruit with your mouse! Don't miss fruit or cut bombs! 💣</p>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    const FRUITS = ['🍉','🍊','🍋','🍇','🍓','🍑','🥝','🍒','🫐','🍍'];
+    let fruits, slices, particles, blade, score, bestScore = 0, lives, combo, comboTimer, state, spawnCD, frame;
+
+    let mouseX = W / 2, mouseY = H / 2, prevMX, prevMY;
+    canvas.addEventListener('mousemove', e => {
+      const r = canvas.getBoundingClientRect();
+      prevMX = mouseX; prevMY = mouseY;
+      mouseX = e.clientX - r.left; mouseY = e.clientY - r.top;
+    });
+    canvas.addEventListener('click', () => { if (state !== 'playing') startGame(); });
+
+    function startGame() {
+      score = 0; lives = 3; combo = 1; comboTimer = 0; frame = 0; spawnCD = 60; state = 'playing';
+      fruits = []; slices = []; particles = []; blade = [];
+      document.getElementById('score').textContent = 0;
+      document.getElementById('combo').textContent = 'x1';
+      document.getElementById('lives').textContent = 3;
+    }
+
+    function spawnFruit() {
+      const isBomb = Math.random() < 0.12;
+      const vx = (Math.random() * 4 - 2);
+      const vy = -(8 + Math.random() * 6);
+      const x = 80 + Math.random() * (W - 160);
+      fruits.push({ x, y: H + 30, vx, vy, r: 30, emoji: isBomb ? '💣' : FRUITS[Math.floor(Math.random() * FRUITS.length)], isBomb, sliced: false, rot: 0, rotSpd: (Math.random() - 0.5) * 0.1 });
+    }
+
+    function spawnSliceParticles(x, y, emoji) {
+      for (let i = 0; i < 8; i++) {
+        const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
+        particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2, life: 1, emoji, r: 14 + Math.random() * 8 });
+      }
+    }
+
+    let lastTS = 0;
+    function loop(ts) {
+      const dt = Math.min((ts - lastTS) / 16, 3); lastTS = ts;
+      if (state === 'playing') update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt) {
+      frame += dt;
+      comboTimer = Math.max(0, comboTimer - dt);
+      if (comboTimer <= 0 && combo > 1) { combo = 1; document.getElementById('combo').textContent = 'x1'; }
+
+      // spawn
+      spawnCD -= dt;
+      if (spawnCD <= 0) { spawnFruit(); spawnCD = 30 + Math.random() * 50; }
+
+      // blade trail
+      blade.push({ x: mouseX, y: mouseY, life: 1 });
+      blade = blade.filter(p => p.life > 0);
+      blade.forEach(p => { p.life -= 0.15 * dt; });
+
+      // fruits
+      fruits.forEach(f => {
+        if (f.sliced) return;
+        f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 0.28 * dt; f.rot += f.rotSpd * dt;
+
+        // off bottom
+        if (f.y - f.r > H) {
+          f.sliced = true;
+          if (!f.isBomb) {
+            lives--; combo = 1; comboTimer = 0;
+            document.getElementById('lives').textContent = lives;
+            document.getElementById('combo').textContent = 'x1';
+            if (lives <= 0) { state = 'dead'; if (score > bestScore) bestScore = score; document.getElementById('best').textContent = Math.floor(bestScore); }
+          }
+          return;
+        }
+
+        // blade collision
+        if (prevMX && Math.hypot(mouseX - f.x, mouseY - f.y) < f.r + 10) {
+          const dx = mouseX - prevMX, dy = mouseY - prevMY;
+          if (Math.hypot(dx, dy) > 5) {
+            f.sliced = true;
+            if (f.isBomb) {
+              lives--; combo = 1; comboTimer = 0;
+              document.getElementById('lives').textContent = lives;
+              document.getElementById('combo').textContent = 'x1';
+              // explosion
+              for (let i = 0; i < 16; i++) {
+                const a = Math.random() * Math.PI * 2, sp = 4 + Math.random() * 6;
+                particles.push({ x: f.x, y: f.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2, life: 1, emoji: '💥', r: 20 });
+              }
+              if (lives <= 0) { state = 'dead'; if (score > bestScore) bestScore = score; document.getElementById('best').textContent = Math.floor(bestScore); }
+            } else {
+              combo++; comboTimer = 60;
+              score += 10 * combo;
+              document.getElementById('score').textContent = Math.floor(score);
+              document.getElementById('combo').textContent = 'x' + combo;
+              spawnSliceParticles(f.x, f.y, f.emoji);
+            }
+          }
+        }
+      });
+      fruits = fruits.filter(f => !f.sliced || f.y < H + 60);
+
+      // particles
+      particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 0.15 * dt; p.life -= 0.04 * dt; });
+      particles = particles.filter(p => p.life > 0);
+    }
+
+    function draw() {
+      // bg
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0f0f1a'); grad.addColorStop(1, '#1a0f1a');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+      // blade trail
+      if (blade.length > 1) {
+        ctx.beginPath();
+        blade.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+        ctx.strokeStyle = '#ffffff88'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.stroke();
+        ctx.strokeStyle = '#4d96ff44'; ctx.lineWidth = 8;
+        ctx.stroke();
+      }
+
+      // fruits
+      fruits.forEach(f => {
+        if (f.sliced) return;
+        ctx.save();
+        ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+        ctx.font = `${f.r * 1.8}px serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(f.emoji, 0, 0);
+        ctx.restore();
+      });
+
+      // particles
+      particles.forEach(p => {
+        ctx.globalAlpha = p.life;
+        ctx.font = `${p.r}px serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(p.emoji, p.x, p.y);
+      });
+      ctx.globalAlpha = 1;
+
+      // cursor dot
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); ctx.fill();
+
+      if (state === 'idle' || state === undefined) {
+        ctx.fillStyle = '#0008'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 30px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🍉 Fruit Slicer', W / 2, H / 2 - 24);
+        ctx.font = '16px Segoe UI'; ctx.fillStyle = '#ccc'; ctx.fillText('Click to Start!', W / 2, H / 2 + 10);
+      }
+      if (state === 'dead') {
+        ctx.fillStyle = '#0008'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#ff6b6b'; ctx.font = 'bold 32px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('💀 Game Over!', W / 2, H / 2 - 24);
+        ctx.fillStyle = '#fff'; ctx.font = '20px Segoe UI';
+        ctx.fillText('Score: ' + Math.floor(score) + '  Best: ' + Math.floor(bestScore), W / 2, H / 2 + 12);
+        ctx.fillStyle = '#aaa'; ctx.font = '14px Segoe UI';
+        ctx.fillText('Click to play again', W / 2, H / 2 + 42);
+      }
+    }
+
+    state = 'idle';
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

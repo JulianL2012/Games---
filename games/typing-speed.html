@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⌨️ Typing Speed</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif; color: #fff;
+    }
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    #info { display: flex; gap: 24px; margin-bottom: 18px; font-size: 1rem; }
+    #info span { background: #1a1a2e; padding: 6px 18px; border-radius: 8px; min-width: 90px; text-align: center; }
+    #passage {
+      max-width: 640px; width: 90vw; background: #1a1a2e; border-radius: 12px;
+      padding: 20px 24px; font-size: 1.15rem; line-height: 1.8;
+      border: 2px solid #4d96ff44; margin-bottom: 14px;
+    }
+    .correct { color: #6bcb77; }
+    .wrong   { color: #ff6b6b; text-decoration: underline; }
+    .cursor  { border-right: 2px solid #4d96ff; animation: blink 0.7s step-end infinite; }
+    @keyframes blink { 50%{border-color:transparent} }
+    .pending { color: #555; }
+    #input {
+      width: 90vw; max-width: 640px; background: #1a1a2e; color: #fff;
+      border: 2px solid #4d96ff; border-radius: 10px; padding: 12px 16px;
+      font-size: 1rem; outline: none;
+    }
+    #input:focus { border-color: #6bcb77; }
+    button { margin-top: 14px; background: #4d96ff; color: #fff; border: none; padding: 10px 30px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #2979d8; }
+    #bar { width: 90vw; max-width: 640px; height: 8px; background: #1a1a2e; border-radius: 6px; margin-top: 12px; overflow: hidden; }
+    #bar-fill { height: 100%; background: linear-gradient(90deg,#4d96ff,#6bcb77); width: 0%; transition: width 0.5s linear; border-radius: 6px; }
+    #result { margin-top: 16px; font-size: 1.1rem; color: #ffd93d; min-height: 28px; text-align: center; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>⌨️ Typing Speed</h1>
+  <div id="info">
+    <span>⏱ <b id="timer">60</b>s</span>
+    <span>WPM: <b id="wpm">0</b></span>
+    <span>Acc: <b id="acc">100</b>%</span>
+    <span>Words: <b id="wcount">0</b></span>
+  </div>
+  <div id="passage"></div>
+  <input id="input" type="text" placeholder="Start typing to begin…" autocomplete="off" spellcheck="false" />
+  <div id="bar"><div id="bar-fill"></div></div>
+  <div id="result"></div>
+  <button onclick="newRound()">New Round</button>
+
+  <script>
+    const PASSAGES = [
+      "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump.",
+      "To be or not to be that is the question. Whether tis nobler in the mind to suffer the slings and arrows of outrageous fortune.",
+      "A journey of a thousand miles begins with a single step. The only way to do great work is to love what you do.",
+      "In the beginning there was code and the code was good. Developers around the world typed furiously to bring their ideas to life.",
+      "The internet is a vast ocean of information. Every search query sends a signal across fiber optic cables spanning continents.",
+      "Coding is not just about writing instructions for computers. It is a creative process that transforms abstract ideas into real applications.",
+      "She sells seashells by the seashore. The shells she sells are surely seashells. So if she sells shells on the seashore, I am sure she sells seashore shells.",
+      "Technology is best when it brings people together. The future belongs to those who believe in the beauty of their dreams.",
+    ];
+    const TIME = 60;
+    let passage, typed, started, timerID, seconds, errors, total;
+
+    function newRound() {
+      clearInterval(timerID);
+      passage = PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
+      typed = ''; started = false; seconds = 0; errors = 0; total = 0;
+      document.getElementById('timer').textContent = TIME;
+      document.getElementById('wpm').textContent = 0;
+      document.getElementById('acc').textContent = 100;
+      document.getElementById('wcount').textContent = 0;
+      document.getElementById('bar-fill').style.width = '0%';
+      document.getElementById('result').textContent = '';
+      const inp = document.getElementById('input');
+      inp.value = ''; inp.disabled = false; inp.focus();
+      render();
+    }
+
+    function render() {
+      const el = document.getElementById('passage');
+      el.innerHTML = '';
+      passage.split('').forEach((ch, i) => {
+        const span = document.createElement('span');
+        if (i < typed.length) {
+          span.className = typed[i] === ch ? 'correct' : 'wrong';
+          span.textContent = ch;
+        } else if (i === typed.length) {
+          span.className = 'cursor pending';
+          span.textContent = ch;
+        } else {
+          span.className = 'pending';
+          span.textContent = ch;
+        }
+        el.appendChild(span);
+      });
+    }
+
+    document.getElementById('input').addEventListener('input', e => {
+      if (!started) {
+        started = true;
+        timerID = setInterval(() => {
+          seconds++;
+          const left = TIME - seconds;
+          document.getElementById('timer').textContent = left;
+          document.getElementById('bar-fill').style.width = (seconds / TIME * 100) + '%';
+          const words = typed.trim().split(/\s+/).filter(Boolean).length;
+          const wpm = Math.round(words / (seconds / 60));
+          document.getElementById('wpm').textContent = wpm;
+          if (left <= 0) endRound();
+        }, 1000);
+      }
+      typed = e.target.value;
+      // count errors
+      errors = 0;
+      typed.split('').forEach((ch, i) => { if (ch !== passage[i]) errors++; });
+      total = typed.length;
+      const acc = total > 0 ? Math.round((total - errors) / total * 100) : 100;
+      document.getElementById('acc').textContent = acc;
+      const words = typed.trim().split(/\s+/).filter(Boolean).length;
+      document.getElementById('wcount').textContent = words;
+      render();
+      if (typed === passage) endRound();
+    });
+
+    function endRound() {
+      clearInterval(timerID);
+      document.getElementById('input').disabled = true;
+      const words = typed.trim().split(/\s+/).filter(Boolean).length;
+      const elapsed = Math.max(1, seconds);
+      const wpm = Math.round(words / (elapsed / 60));
+      const acc = total > 0 ? Math.round((total - errors) / total * 100) : 100;
+      document.getElementById('result').textContent =
+        `🏆 Final: ${wpm} WPM | Accuracy: ${acc}% | Words: ${words}`;
+    }
+
+    newRound();
+  </script>
+</body>
+</html>
