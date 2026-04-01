@@ -1,4 +1,4 @@
-# 🎮 Games Hub — 32 Browser Games
+# 🎮 Games Hub — 31 Browser Games
 
 > **All games are coded in pure HTML, CSS, and JavaScript — no downloads, no plugins, no accounts.  
 > Just open a file in any browser and play instantly!**
@@ -142,15 +142,6 @@ Games---/
 ---
 
 ## 🎯 Featured Highlights
-
-### 🌙 Night Watch (FNAF-Inspired Horror)
-The most complex game in the collection. You play as a night security guard working a 12 AM to 6 AM shift. Animatronic characters roam the building and you must:
-- **Check security cameras** to track their locations
-- **Close the doors** to block their entry to your office
-- **Manage your power** — everything drains it and when power hits zero the lights go out
-- Survive all **6 in-game hours** to beat the night
-
-Difficulty increases each night. Inspired by Five Nights at Freddy's.
 
 ### 👻 Pac-Man
 Full Pac-Man implementation with ghost AI that switches between chase and scatter behavior, power pellets that make ghosts vulnerable, level progression, and animated ghosts and Pac-Man character.
