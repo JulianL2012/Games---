@@ -1,4 +1,4 @@
-# 🎮 Games Hub — 31 Browser Games
+# 🎮 Games Hub — 34 Browser Games
 
 > **All games are coded in pure HTML, CSS, and JavaScript — no downloads, no plugins, no accounts.  
 > Just open a file in any browser and play instantly!**
@@ -7,10 +7,10 @@
 
 ## 📖 About This Repository
 
-This is a massive collection of **32 browser-based games**, all built from scratch using pure **HTML5 Canvas and Vanilla JavaScript**.  
+This is a massive collection of **34 browser-based games**, all built from scratch using pure **HTML5 Canvas and Vanilla JavaScript**.  
 Every game is a single self-contained `.html` file — open it and play. No build tools, no dependencies, no internet required after downloading.
 
-The games range from timeless **classics** (Snake, Tetris, Pac-Man, Chess, Solitaire) to **classroom favorites** (Cookie Clicker, Slope, Wordle, Geometry Dash, Dino Jump), **action/shooting** games (Space Invaders, Asteroids, Zombie Shooter), and even a **Five Nights at Freddy's-inspired horror game** (Night Watch).
+The games range from timeless **classics** (Snake, Tetris, Pac-Man, Chess, Solitaire) to **classroom favorites** (Cookie Clicker, Slope, Wordle, Geometry Dash, Dino Jump), **action/shooting** games (Space Invaders, Asteroids, Zombie Shooter), **multiplayer games** (Air Hockey, Battleship), and even a **Five Nights at Freddy's-inspired horror game** (Night Watch).
 
 ---
 
@@ -89,6 +89,14 @@ Open `index.html` on your phone browser and play — no app required.
 |------|-------------|----------|
 | 🌙 **Night Watch** | FNAF-inspired horror game — monitor cameras, close doors, conserve power, survive until 6 AM | Mouse |
 
+### 🎮 Multiplayer
+
+| Game | Description | Controls |
+|------|-------------|----------|
+| 🏒 **Air Hockey** | Real-time 2-player air hockey on the same keyboard — first to 7 wins | P1: W/S · P2: ↑/↓ |
+| 🚢 **Battleship** | Pass-and-play Battleship on the same device — place ships, take turns firing | Mouse |
+| 🌐 **Battleship LAN** | Battleship over your local Wi-Fi network — requires the Node.js server | Browser (LAN) |
+
 ---
 
 ## 🛠️ Technical Details
@@ -99,6 +107,8 @@ Open `index.html` on your phone browser and play — no app required.
 - **Compatibility:** Chrome, Firefox, Edge, Safari, Brave — any modern browser
 - **Offline:** 100% offline capable once files are downloaded
 - **Mobile:** Most games support touch controls
+- **Multiplayer (offline):** Air Hockey and Battleship support 2 players on the same device
+- **Multiplayer (LAN):** Battleship LAN uses a Node.js + WebSocket server for real network play
 
 ---
 
@@ -136,8 +146,35 @@ Games---/
     ├── zombie-shooter.html
     ├── fruit-slicer.html
     ├── racing.html
-    └── fnaf.html            ← Night Watch (horror)
+    ├── fnaf.html            ← Night Watch (horror)
+    ├── air-hockey.html      ← 2-player same-keyboard
+    ├── battleship.html      ← 2-player pass & play
+    └── battleship-lan/      ← LAN multiplayer (Node.js server)
+        ├── server.js
+        ├── index.html
+        ├── package.json
+        └── README.md
 ```
+
+---
+
+## 🌐 LAN Multiplayer (Battleship)
+
+Battleship LAN lets two players on the same Wi-Fi network play against each other in real time using a lightweight **Node.js WebSocket server**.
+
+### Requirements
+- **Node.js 14+** installed on the host machine
+
+### Setup
+```bash
+cd games/battleship-lan
+npm install
+npm start
+```
+
+The server prints a **Network URL** (e.g. `http://192.168.1.42:3000`). Both players open that URL in their browser, type the same **Room Code**, and play — no internet needed.
+
+> All offline games in this repository continue to work without the server.
 
 ---
 

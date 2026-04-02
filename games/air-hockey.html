@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏒 Air Hockey — 2 Player</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 6px; }
+    #subtitle { color: #888; font-size: 0.9rem; margin-bottom: 14px; }
+    canvas {
+      background: #111827;
+      border: 3px solid #4d96ff;
+      border-radius: 8px;
+      display: block;
+    }
+    #info { margin-top: 12px; font-size: 0.85rem; color: #888; text-align: center; }
+    #msg {
+      margin-top: 10px; font-size: 1.4rem; color: #ffd93d;
+      min-height: 32px; text-align: center;
+    }
+    button {
+      margin-top: 12px;
+      background: #4d96ff; color: #fff;
+      border: none; padding: 10px 30px;
+      border-radius: 8px; font-size: 1rem; cursor: pointer;
+    }
+    button:hover { background: #2979d8; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🏒 Air Hockey</h1>
+  <p id="subtitle">2 Players · Same Keyboard</p>
+  <canvas id="c" width="700" height="440"></canvas>
+  <div id="info">
+    Player 1 (Blue): <strong>W / S</strong> &nbsp;|&nbsp;
+    Player 2 (Red): <strong>↑ / ↓</strong>
+  </div>
+  <div id="msg"></div>
+  <button id="btn" onclick="startGame()">Start Game</button>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const msgEl = document.getElementById('msg');
+    const btnEl = document.getElementById('btn');
+    const W = canvas.width, H = canvas.height;
+
+    const PADDLE_W = 14, PADDLE_H = 80, PUCK_R = 14;
+    const GOAL_H = 140;  // height of the goal opening
+    const GOAL_TOP = (H - GOAL_H) / 2;
+    const WIN_SCORE = 7;
+    const SPEED_MULT = 1.04; // puck speeds up slightly each hit
+
+    let state = 'idle'; // idle | playing | goal | over
+    let score = [0, 0];
+    let keys = {};
+
+    let p1, p2, puck;
+
+    function resetPositions() {
+      p1 = { x: 30, y: H / 2 - PADDLE_H / 2, dy: 0 };
+      p2 = { x: W - 30 - PADDLE_W, y: H / 2 - PADDLE_H / 2, dy: 0 };
+      puck = {
+        x: W / 2, y: H / 2,
+        vx: (Math.random() > 0.5 ? 1 : -1) * 4.5,
+        vy: (Math.random() * 4 - 2)
+      };
+    }
+
+    function startGame() {
+      score = [0, 0];
+      state = 'playing';
+      msgEl.textContent = '';
+      btnEl.style.display = 'none';
+      resetPositions();
+      requestAnimationFrame(loop);
+    }
+
+    // keyboard
+    document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+    document.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+    const PADDLE_SPEED = 5;
+
+    function updatePaddles() {
+      // Player 1: W / S
+      if (keys['KeyW']) p1.y -= PADDLE_SPEED;
+      if (keys['KeyS']) p1.y += PADDLE_SPEED;
+      p1.y = Math.max(0, Math.min(H - PADDLE_H, p1.y));
+
+      // Player 2: ArrowUp / ArrowDown
+      if (keys['ArrowUp'])   p2.y -= PADDLE_SPEED;
+      if (keys['ArrowDown']) p2.y += PADDLE_SPEED;
+      p2.y = Math.max(0, Math.min(H - PADDLE_H, p2.y));
+    }
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function circleRect(cx, cy, r, rx, ry, rw, rh) {
+      const nearX = clamp(cx, rx, rx + rw);
+      const nearY = clamp(cy, ry, ry + rh);
+      const dx = cx - nearX, dy = cy - nearY;
+      return dx * dx + dy * dy <= r * r;
+    }
+
+    function resolvePaddleCollision(paddle, side) {
+      // side: 'left' or 'right'
+      const px = paddle.x, py = paddle.y;
+      if (!circleRect(puck.x, puck.y, PUCK_R, px, py, PADDLE_W, PADDLE_H)) return;
+
+      // Deflect
+      const centerY = py + PADDLE_H / 2;
+      const relHit = (puck.y - centerY) / (PADDLE_H / 2); // -1 to 1
+      const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy) * SPEED_MULT;
+      const angle = relHit * Math.PI / 3; // max 60 degrees
+
+      if (side === 'left') {
+        puck.vx =  speed * Math.cos(angle);
+        puck.vy =  speed * Math.sin(angle);
+        puck.x = px + PADDLE_W + PUCK_R + 1;
+      } else {
+        puck.vx = -speed * Math.cos(angle);
+        puck.vy =  speed * Math.sin(angle);
+        puck.x = px - PUCK_R - 1;
+      }
+    }
+
+    let goalCooldown = 0;
+
+    function updatePuck() {
+      if (goalCooldown > 0) { goalCooldown--; return; }
+
+      puck.x += puck.vx;
+      puck.y += puck.vy;
+
+      // Top / bottom walls
+      if (puck.y - PUCK_R < 0)  { puck.y = PUCK_R;      puck.vy = Math.abs(puck.vy); }
+      if (puck.y + PUCK_R > H)  { puck.y = H - PUCK_R;  puck.vy = -Math.abs(puck.vy); }
+
+      // Left wall (goal for P2 if in goal zone, else bounce)
+      if (puck.x - PUCK_R < 0) {
+        if (puck.y > GOAL_TOP && puck.y < GOAL_TOP + GOAL_H) {
+          scoreGoal(1); return;
+        }
+        puck.x = PUCK_R;
+        puck.vx = Math.abs(puck.vx);
+      }
+
+      // Right wall (goal for P1 if in goal zone, else bounce)
+      if (puck.x + PUCK_R > W) {
+        if (puck.y > GOAL_TOP && puck.y < GOAL_TOP + GOAL_H) {
+          scoreGoal(0); return;
+        }
+        puck.x = W - PUCK_R;
+        puck.vx = -Math.abs(puck.vx);
+      }
+
+      resolvePaddleCollision(p1, 'left');
+      resolvePaddleCollision(p2, 'right');
+    }
+
+    function scoreGoal(scoringPlayer) {
+      score[scoringPlayer]++;
+      goalCooldown = 80;
+      if (score[scoringPlayer] >= WIN_SCORE) {
+        state = 'over';
+        msgEl.textContent = `🏆 Player ${scoringPlayer + 1} wins!`;
+        btnEl.textContent = 'Play Again';
+        btnEl.style.display = '';
+      } else {
+        msgEl.textContent = `🥅 Player ${scoringPlayer + 1} scores!`;
+        setTimeout(() => {
+          if (state === 'playing') msgEl.textContent = '';
+          resetPositions();
+        }, 900);
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+
+      // Rink background
+      ctx.fillStyle = '#0a1628';
+      ctx.fillRect(0, 0, W, H);
+
+      // Center line
+      ctx.setLineDash([10, 8]);
+      ctx.strokeStyle = '#ffffff22';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Center circle
+      ctx.strokeStyle = '#ffffff22';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, 60, 0, Math.PI * 2); ctx.stroke();
+
+      // Goals (openings in the walls)
+      drawGoal('left');
+      drawGoal('right');
+
+      // Score
+      ctx.fillStyle = '#4d96ff';
+      ctx.font = 'bold 48px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText(score[0], W / 4, 55);
+      ctx.fillStyle = '#ff6b6b';
+      ctx.fillText(score[1], 3 * W / 4, 55);
+
+      // Player labels
+      ctx.font = '13px Segoe UI';
+      ctx.fillStyle = '#4d96ff88';
+      ctx.fillText('P1  W/S', W / 4, 78);
+      ctx.fillStyle = '#ff6b6b88';
+      ctx.fillText('P2  ↑/↓', 3 * W / 4, 78);
+
+      // Paddles
+      drawPaddle(p1, '#4d96ff');
+      drawPaddle(p2, '#ff6b6b');
+
+      // Puck
+      ctx.beginPath();
+      ctx.arc(puck.x, puck.y, PUCK_R, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffffaa';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function drawGoal(side) {
+      const x = side === 'left' ? 0 : W - 12;
+      // Draw the goal net colour
+      ctx.fillStyle = '#ffffff11';
+      ctx.fillRect(x, GOAL_TOP, 12, GOAL_H);
+      // Border lines above and below goal
+      ctx.strokeStyle = '#ffffff55';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(side === 'left' ? 0 : W, 0);
+      ctx.lineTo(side === 'left' ? 0 : W, GOAL_TOP);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(side === 'left' ? 0 : W, GOAL_TOP + GOAL_H);
+      ctx.lineTo(side === 'left' ? 0 : W, H);
+      ctx.stroke();
+    }
+
+    function drawPaddle(p, color) {
+      const radius = 8;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(p.x + radius, p.y);
+      ctx.lineTo(p.x + PADDLE_W - radius, p.y);
+      ctx.arcTo(p.x + PADDLE_W, p.y, p.x + PADDLE_W, p.y + radius, radius);
+      ctx.lineTo(p.x + PADDLE_W, p.y + PADDLE_H - radius);
+      ctx.arcTo(p.x + PADDLE_W, p.y + PADDLE_H, p.x + PADDLE_W - radius, p.y + PADDLE_H, radius);
+      ctx.lineTo(p.x + radius, p.y + PADDLE_H);
+      ctx.arcTo(p.x, p.y + PADDLE_H, p.x, p.y + PADDLE_H - radius, radius);
+      ctx.lineTo(p.x, p.y + radius);
+      ctx.arcTo(p.x, p.y, p.x + radius, p.y, radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ffffffaa';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    let running = false;
+    function loop() {
+      if (state !== 'playing') { running = false; return; }
+      running = true;
+      updatePaddles();
+      updatePuck();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // Initial draw of the rink
+    draw();
+    msgEl.textContent = 'Press Start to play!';
+  </script>
+</body>
+</html>

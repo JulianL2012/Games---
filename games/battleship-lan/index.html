@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🚢 Battleship — LAN Multiplayer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px 40px;
+      user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 4px; }
+    #subtitle { color: #4d96ff; font-size: 0.9rem; margin-bottom: 20px; }
+
+    /* Screens */
+    .screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+    .screen.active { display: flex; }
+
+    /* Connect */
+    #connect-form { display: flex; flex-direction: column; gap: 12px; max-width: 320px; width: 100%; margin-top: 10px; }
+    #connect-form label { font-size: 0.85rem; color: #aaa; margin-bottom: 2px; }
+    #connect-form input {
+      background: #1a2a4a; border: 2px solid #2a3a6a;
+      color: #fff; padding: 10px 14px; border-radius: 8px;
+      font-size: 1rem; outline: none; width: 100%;
+    }
+    #connect-form input:focus { border-color: #4d96ff; }
+    #server-url-hint { font-size: 0.78rem; color: #666; }
+
+    /* Grid */
+    .grid-label { font-size: 0.75rem; color: #888; letter-spacing: 1px;
+                  text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 36px);
+      grid-template-rows: repeat(10, 36px);
+      gap: 3px;
+    }
+    .cell {
+      width: 36px; height: 36px;
+      border-radius: 4px;
+      background: #1a2a4a;
+      border: 1px solid #2a3a5a;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      transition: background 0.12s;
+    }
+    .cell:hover:not(.no-hover) { background: #2a4a8a; }
+    .cell.ship  { background: #2a4a7a; border-color: #4d96ff55; }
+    .cell.hit   { background: #cc2200; cursor: default; }
+    .cell.miss  { background: #1a2a2a; cursor: default; }
+    .cell.hit.sunk  { background: #7a1a00; }
+    .cell.hit::after  { content: '💥'; font-size: 0.9rem; }
+    .cell.miss::after { content: '·'; font-size: 1.3rem; color: #4d96ff; }
+    .cell.hit.sunk::after { content: '🔥'; font-size: 0.9rem; }
+    .cell.no-hover { cursor: default; }
+
+    .col-labels { display: flex; gap: 3px; margin-bottom: 3px; }
+    .row-labels { display: flex; flex-direction: column; gap: 3px; margin-right: 3px; }
+    .lbl { width: 36px; height: 36px; display: flex; align-items: center;
+           justify-content: center; font-size: 0.72rem; color: #556; }
+
+    /* Ship selector */
+    .ships-panel { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 12px 0; }
+    .ship-btn {
+      background: #1a2a4a; border: 2px solid #2a3a6a;
+      color: #fff; padding: 7px 12px;
+      border-radius: 8px; cursor: pointer; font-size: 0.82rem;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+    }
+    .ship-btn.selected { border-color: #4d96ff; background: #1a3a6a; }
+    .ship-btn.placed   { border-color: #6bcb7744; color: #6bcb77; cursor: default; }
+    .ship-btn .blocks  { display: flex; gap: 2px; }
+    .ship-btn .blk     { width: 10px; height: 10px; background: #4d96ff; border-radius: 2px; }
+
+    /* Buttons */
+    button.primary {
+      background: #4d96ff; color: #fff;
+      border: none; padding: 10px 28px;
+      border-radius: 8px; font-size: 1rem; cursor: pointer;
+    }
+    button.primary:hover { background: #2979d8; }
+    button.secondary {
+      background: #1a2a4a; color: #aaa;
+      border: 2px solid #2a3a6a; padding: 8px 20px;
+      border-radius: 8px; font-size: 0.9rem; cursor: pointer;
+    }
+    button.secondary:hover { border-color: #4d96ff55; color: #fff; }
+
+    /* Orient button */
+    #orient-btn {
+      background: #1a2a4a; border: 2px solid #4d96ff55;
+      color: #4d96ff; padding: 6px 16px;
+      border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+      margin: 4px 0 10px;
+    }
+
+    /* Status / messages */
+    #status { font-size: 1rem; color: #ffd93d; min-height: 24px; margin: 8px 0; text-align: center; }
+    #turn-banner {
+      font-size: 1.2rem; font-weight: bold; margin-bottom: 6px;
+      padding: 8px 20px; border-radius: 8px; background: #1a2a4a;
+    }
+    #turn-banner.my-turn   { border: 2px solid #6bcb77; color: #6bcb77; }
+    #turn-banner.opp-turn  { border: 2px solid #888; color: #888; }
+
+    /* Two-column game layout */
+    #game-boards { display: flex; gap: 32px; flex-wrap: wrap; justify-content: center; }
+
+    /* Chat */
+    #chat-box {
+      margin-top: 20px; width: 100%; max-width: 500px;
+      background: #1a1a2e; border-radius: 8px; padding: 10px;
+    }
+    #chat-log {
+      height: 120px; overflow-y: auto;
+      font-size: 0.85rem; color: #ccc; margin-bottom: 8px;
+      border: 1px solid #2a2a4a; border-radius: 6px; padding: 6px;
+    }
+    #chat-row { display: flex; gap: 6px; }
+    #chat-input {
+      flex: 1; background: #0f0f1a; border: 1px solid #2a3a6a;
+      color: #fff; padding: 7px 10px; border-radius: 6px; font-size: 0.85rem;
+    }
+
+    #win-msg { font-size: 2.2rem; color: #ffd93d; margin-bottom: 8px; }
+    #connection-status { font-size: 0.8rem; color: #666; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🚢 Battleship</h1>
+  <p id="subtitle">LAN Multiplayer</p>
+
+  <!-- ── Connect screen ───────────────────────────────────────── -->
+  <div class="screen active" id="connect-screen">
+    <p style="color:#aaa;font-size:0.9rem;margin-bottom:14px;text-align:center;max-width:420px">
+      Both players open this page in their browser on the same Wi-Fi network.<br>
+      Use the same <strong>Room Code</strong> to connect.
+    </p>
+    <div id="connect-form">
+      <div>
+        <label>Server URL (leave blank for same machine)</label>
+        <input id="server-url" type="text" placeholder="ws://192.168.x.x:3000" />
+        <div id="server-url-hint">Player 2: enter the ws:// address shown in the server window.</div>
+      </div>
+      <div>
+        <label>Room Code</label>
+        <input id="room-code" type="text" placeholder="e.g. SHARK" maxlength="8" />
+      </div>
+      <button class="primary" onclick="connectToServer()">Connect &amp; Join</button>
+    </div>
+    <div id="connection-status"></div>
+  </div>
+
+  <!-- ── Waiting screen ───────────────────────────────────────── -->
+  <div class="screen" id="waiting-screen">
+    <div style="font-size:3rem;margin-bottom:14px">⏳</div>
+    <p id="waiting-text" style="color:#aaa">Waiting for opponent…</p>
+  </div>
+
+  <!-- ── Setup (place ships) screen ───────────────────────────── -->
+  <div class="screen" id="setup-screen">
+    <h2 style="margin-bottom:6px">Place Your Ships</h2>
+    <p style="color:#888;font-size:0.85rem;margin-bottom:10px">Select a ship, then click the grid.</p>
+    <div class="ships-panel" id="ships-panel"></div>
+    <button id="orient-btn" onclick="toggleOrient()">Orientation: Horizontal</button>
+    <div style="display:flex">
+      <div class="row-labels" id="setup-row-labels"></div>
+      <div>
+        <div class="col-labels" id="setup-col-labels"></div>
+        <div class="grid" id="setup-grid"></div>
+      </div>
+    </div>
+    <div id="status"></div>
+    <button class="primary" id="ready-btn" onclick="sendBoard()" style="display:none;margin-top:12px">
+      ✅ Ready — Send Fleet
+    </button>
+  </div>
+
+  <!-- ── Game (attack) screen ─────────────────────────────────── -->
+  <div class="screen" id="game-screen">
+    <div id="turn-banner" class="opp-turn">Waiting…</div>
+    <div id="game-boards">
+      <div>
+        <div class="grid-label">🎯 Enemy Sea (click to fire)</div>
+        <div style="display:flex">
+          <div class="row-labels" id="atk-row-labels"></div>
+          <div>
+            <div class="col-labels" id="atk-col-labels"></div>
+            <div class="grid" id="attack-grid"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="grid-label">🛡️ Your Fleet</div>
+        <div style="display:flex">
+          <div class="row-labels" id="own-row-labels"></div>
+          <div>
+            <div class="col-labels" id="own-col-labels"></div>
+            <div class="grid" id="own-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="shot-msg" style="margin-top:10px;font-size:1rem;color:#ffd93d;min-height:22px;text-align:center"></div>
+
+    <!-- Chat -->
+    <div id="chat-box">
+      <div style="font-size:0.78rem;color:#666;margin-bottom:6px">💬 Chat</div>
+      <div id="chat-log"></div>
+      <div id="chat-row">
+        <input id="chat-input" type="text" placeholder="Say something…" maxlength="200"
+               onkeydown="if(event.key==='Enter')sendChat()" />
+        <button class="secondary" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Win screen ───────────────────────────────────────────── -->
+  <div class="screen" id="win-screen">
+    <div id="win-msg"></div>
+    <button class="primary" style="margin-top:16px" onclick="location.reload()">Play Again</button>
+  </div>
+
+  <script>
+    // ── Constants ─────────────────────────────────────────────────────────────
+    const COLS = 'ABCDEFGHIJ'.split('');
+    const ROWS = Array.from({length: 10}, (_, i) => i + 1);
+    const SHIPS_DEF = [
+      { name: 'Carrier',    size: 5, icon: '🛳️' },
+      { name: 'Battleship', size: 4, icon: '⚓' },
+      { name: 'Cruiser',    size: 3, icon: '🚢' },
+      { name: 'Submarine',  size: 3, icon: '🤿' },
+      { name: 'Destroyer',  size: 2, icon: '⚡' },
+    ];
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let ws = null;
+    let myPlayerIdx = -1;  // 0 or 1
+    let myBoard = new Array(100).fill(0); // ship ids
+    let oppShotsOnMe = [];
+    let myShotsOnOpp = [];
+    let oppBoard = new Array(100).fill(0); // only revealed cells
+    let myShips = []; // { id, cells }
+    let horizontal = true;
+    let selectedShipIdx = -1;
+    let placed = [];
+    let myTurn = false;
+    let gameOver = false;
+
+    // ── Screen helpers ────────────────────────────────────────────────────────
+    function show(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ── Grid label helpers ────────────────────────────────────────────────────
+    function buildLabels(colEl, rowEl) {
+      colEl.innerHTML = '';
+      rowEl.innerHTML = '';
+      COLS.forEach(c => {
+        const d = document.createElement('div');
+        d.className = 'lbl'; d.textContent = c; colEl.appendChild(d);
+      });
+      ROWS.forEach(r => {
+        const d = document.createElement('div');
+        d.className = 'lbl'; d.textContent = r; rowEl.appendChild(d);
+      });
+    }
+
+    // ── Connection ────────────────────────────────────────────────────────────
+    function connectToServer() {
+      const urlInput = document.getElementById('server-url').value.trim();
+      const roomCode = document.getElementById('room-code').value.trim().toUpperCase();
+
+      if (!roomCode) { alert('Enter a room code.'); return; }
+
+      const host = urlInput || `ws://${location.hostname}:3000`;
+      const statusEl = document.getElementById('connection-status');
+      statusEl.textContent = `Connecting to ${host}…`;
+
+      try { ws = new WebSocket(host); }
+      catch (e) { statusEl.textContent = 'Invalid server URL.'; return; }
+
+      ws.onopen = () => {
+        statusEl.textContent = 'Connected!';
+        ws.send(JSON.stringify({ type: 'join', room: roomCode }));
+      };
+      ws.onerror = () => { statusEl.textContent = '❌ Connection failed. Is the server running?'; };
+      ws.onclose = () => {
+        if (!gameOver) statusEl.textContent = '⚠️ Disconnected from server.';
+      };
+      ws.onmessage = (ev) => {
+        let msg;
+        try { msg = JSON.parse(ev.data); } catch { return; }
+        handleMessage(msg);
+      };
+    }
+
+    function handleMessage(msg) {
+      switch (msg.type) {
+
+        case 'joined':
+          myPlayerIdx = msg.player;
+          show('waiting-screen');
+          document.getElementById('waiting-text').textContent =
+            `You are Player ${myPlayerIdx + 1}. Waiting for opponent…`;
+          break;
+
+        case 'waiting':
+          document.getElementById('waiting-text').textContent = msg.text;
+          break;
+
+        case 'start_setup':
+          initSetup();
+          show('setup-screen');
+          break;
+
+        case 'board_ok':
+          document.getElementById('status').textContent = '⏳ Waiting for opponent to finish placing ships…';
+          document.getElementById('ready-btn').style.display = 'none';
+          break;
+
+        case 'game_start':
+          initGame();
+          show('game-screen');
+          setTurn(msg.currentTurn);
+          break;
+
+        case 'shot_result':
+          applyShotResult(msg);
+          break;
+
+        case 'game_over':
+          applyShotResult(msg);
+          gameOver = true;
+          setTimeout(() => {
+            show('win-screen');
+            document.getElementById('win-msg').textContent =
+              msg.winner === myPlayerIdx ? '🏆 You win!' : '💀 You lose!';
+          }, 1200);
+          break;
+
+        case 'turn':
+          setTurn(msg.currentTurn);
+          break;
+
+        case 'chat':
+          appendChat(`Player ${msg.player}`, msg.text);
+          break;
+
+        case 'opponent_left':
+          alert('Opponent disconnected.');
+          break;
+
+        case 'error':
+          alert('Server: ' + msg.text);
+          break;
+      }
+    }
+
+    // ── Setup phase ───────────────────────────────────────────────────────────
+    function initSetup() {
+      placed = new Array(SHIPS_DEF.length).fill(false);
+      myBoard = new Array(100).fill(0);
+      myShips = [];
+      renderShipsPanel();
+      buildLabels(
+        document.getElementById('setup-col-labels'),
+        document.getElementById('setup-row-labels')
+      );
+      renderSetupGrid();
+      document.getElementById('status').textContent = 'Select a ship and place it on the grid.';
+    }
+
+    function renderShipsPanel() {
+      const panel = document.getElementById('ships-panel');
+      panel.innerHTML = '';
+      SHIPS_DEF.forEach((s, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'ship-btn';
+        if (placed[i]) btn.classList.add('placed');
+        else if (selectedShipIdx === i) btn.classList.add('selected');
+        btn.innerHTML = `<span>${s.icon} ${s.name}</span>
+          <div class="blocks">${'<div class="blk"></div>'.repeat(s.size)}</div>`;
+        if (!placed[i]) btn.onclick = () => { selectedShipIdx = i; renderShipsPanel(); };
+        panel.appendChild(btn);
+      });
+    }
+
+    function toggleOrient() {
+      horizontal = !horizontal;
+      document.getElementById('orient-btn').textContent =
+        `Orientation: ${horizontal ? 'Horizontal' : 'Vertical'}`;
+    }
+
+    function renderSetupGrid() {
+      const grid = document.getElementById('setup-grid');
+      grid.innerHTML = '';
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if (myBoard[r * 10 + c]) cell.classList.add('ship');
+          cell.onclick = () => placeShip(r, c);
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function canPlace(row, col, size, horiz) {
+      for (let i = 0; i < size; i++) {
+        const r = horiz ? row : row + i;
+        const c = horiz ? col + i : col;
+        if (r < 0 || r >= 10 || c < 0 || c >= 10) return false;
+        if (myBoard[r * 10 + c]) return false;
+      }
+      return true;
+    }
+
+    function placeShip(row, col) {
+      if (selectedShipIdx === -1) {
+        document.getElementById('status').textContent = '⚠️ Select a ship first!'; return;
+      }
+      const ship = SHIPS_DEF[selectedShipIdx];
+      if (!canPlace(row, col, ship.size, horizontal)) {
+        document.getElementById('status').textContent = '⚠️ Cannot place here!'; return;
+      }
+      const cells = [];
+      for (let i = 0; i < ship.size; i++) {
+        const r = horizontal ? row : row + i;
+        const c = horizontal ? col + i : col;
+        myBoard[r * 10 + c] = selectedShipIdx + 1;
+        cells.push(r * 10 + c);
+      }
+      myShips.push({ id: selectedShipIdx + 1, name: ship.name, cells });
+      placed[selectedShipIdx] = true;
+      selectedShipIdx = -1;
+      renderSetupGrid();
+      renderShipsPanel();
+      if (placed.every(Boolean)) {
+        document.getElementById('status').textContent = '✅ All ships placed! Press Ready when done.';
+        document.getElementById('ready-btn').style.display = '';
+      } else {
+        document.getElementById('status').textContent = 'Ship placed! Select next ship.';
+      }
+    }
+
+    function sendBoard() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'board', board: myBoard }));
+        document.getElementById('status').textContent = '⏳ Waiting for opponent…';
+        document.getElementById('ready-btn').style.display = 'none';
+      }
+    }
+
+    // ── Game phase ────────────────────────────────────────────────────────────
+    function initGame() {
+      myShotsOnOpp = [];
+      oppShotsOnMe = [];
+      buildLabels(document.getElementById('atk-col-labels'), document.getElementById('atk-row-labels'));
+      buildLabels(document.getElementById('own-col-labels'), document.getElementById('own-row-labels'));
+      renderAttackGrid();
+      renderOwnGrid();
+    }
+
+    function setTurn(currentTurnIdx) {
+      myTurn = (currentTurnIdx === myPlayerIdx);
+      const banner = document.getElementById('turn-banner');
+      if (myTurn) {
+        banner.className = 'my-turn';
+        banner.textContent = "🎯 Your turn — Fire!";
+      } else {
+        banner.className = 'opp-turn';
+        banner.textContent = "⏳ Opponent's turn…";
+      }
+      renderAttackGrid(); // refresh hover ability
+    }
+
+    function renderAttackGrid() {
+      const grid = document.getElementById('attack-grid');
+      grid.innerHTML = '';
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          const shot = myShotsOnOpp.find(s => s.r === r && s.c === c);
+          if (shot) {
+            cell.classList.add(shot.hit ? 'hit' : 'miss');
+            if (shot.sunk) cell.classList.add('sunk');
+            cell.classList.add('no-hover');
+          } else if (myTurn && !gameOver) {
+            cell.onclick = () => fireAt(r, c);
+          } else {
+            cell.classList.add('no-hover');
+          }
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function renderOwnGrid() {
+      const grid = document.getElementById('own-grid');
+      grid.innerHTML = '';
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell no-hover';
+          if (myBoard[r * 10 + c]) cell.classList.add('ship');
+          const shot = oppShotsOnMe.find(s => s.r === r && s.c === c);
+          if (shot) {
+            cell.classList.add(shot.hit ? 'hit' : 'miss');
+            if (shot.sunk) cell.classList.add('sunk');
+          }
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function fireAt(r, c) {
+      if (!myTurn || gameOver) return;
+      if (myShotsOnOpp.find(s => s.r === r && s.c === c)) return;
+      ws.send(JSON.stringify({ type: 'fire', r, c }));
+      myTurn = false; // Optimistic: prevent double-click
+    }
+
+    function applyShotResult(msg) {
+      const { shooter, r, c, hit, sunk, shipId } = msg;
+      if (shooter === myPlayerIdx) {
+        // My shot on opponent
+        myShotsOnOpp.push({ r, c, hit, sunk });
+        document.getElementById('shot-msg').textContent =
+          sunk ? `💥 You sunk their ${SHIPS_DEF[shipId - 1]?.name || 'ship'}!` :
+          hit  ? '💥 Hit!' : '💧 Miss!';
+        renderAttackGrid();
+      } else {
+        // Opponent shot on me
+        const isHit = myBoard[r * 10 + c] > 0;
+        // Check if sunk (all cells of that ship are hit)
+        let isSunk = false;
+        if (isHit) {
+          const myShip = myShips.find(s => s.id === myBoard[r * 10 + c]);
+          if (myShip) isSunk = myShip.cells.every(idx =>
+            oppShotsOnMe.some(s => s.r * 10 + s.c === idx) || idx === r * 10 + c
+          );
+          if (isSunk && myShip) myShip.sunk = true;
+        }
+        oppShotsOnMe.push({ r, c, hit: isHit, sunk: isSunk });
+        document.getElementById('shot-msg').textContent =
+          isSunk ? `🔥 Opponent sunk your ${myShips.find(s=>s.id===myBoard[r*10+c])?.name||'ship'}!` :
+          isHit  ? '🔥 Your ship was hit!' : '💧 Opponent missed!';
+        renderOwnGrid();
+      }
+    }
+
+    // ── Chat ──────────────────────────────────────────────────────────────────
+    function sendChat() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text || !ws) return;
+      ws.send(JSON.stringify({ type: 'chat', text }));
+      input.value = '';
+    }
+
+    function appendChat(who, text) {
+      const log = document.getElementById('chat-log');
+      const line = document.createElement('div');
+      line.textContent = `${who}: ${text}`;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+    }
+  </script>
+</body>
+</html>

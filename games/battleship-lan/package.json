@@ -1,0 +1,13 @@
+{
+  "name": "battleship-lan-server",
+  "version": "1.0.0",
+  "description": "Local-network WebSocket server for 2-player Battleship",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
