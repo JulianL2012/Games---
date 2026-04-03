@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🚢 Battleship — 2 Player</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f1a;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      user-select: none;
+    }
+    h1 { font-size: 2rem; margin-bottom: 4px; }
+    #subtitle { color: #888; font-size: 0.9rem; margin-bottom: 16px; }
+    #back { position: fixed; top: 14px; left: 14px; font-size: 0.9rem; color: #aaa; text-decoration: none; }
+    #back:hover { color: #fff; }
+
+    /* Screens */
+    .screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+    .screen.active { display: flex; }
+
+    /* Cover screen (pass device) */
+    #cover-screen {
+      background: #0f0f1a;
+      position: fixed; inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      gap: 20px;
+    }
+    #cover-screen.active { display: flex; }
+    #cover-screen h2 { font-size: 2.2rem; color: #ffd93d; }
+    #cover-screen p { color: #aaa; font-size: 1rem; text-align: center; max-width: 360px; }
+
+    /* Grid */
+    .grid-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .grid-label { font-size: 0.75rem; color: #888; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 38px);
+      grid-template-rows: repeat(10, 38px);
+      gap: 3px;
+    }
+    .cell {
+      width: 38px; height: 38px;
+      border-radius: 4px;
+      background: #1a2a4a;
+      border: 1px solid #2a3a5a;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      transition: background 0.15s;
+    }
+    .cell:hover { background: #2a3a6a; }
+    .cell.ship { background: #2a4a7a; border-color: #4d96ff55; }
+    .cell.hit  { background: #cc2200; cursor: default; }
+    .cell.miss { background: #1a2a2a; cursor: default; }
+    .cell.hit::after  { content: '💥'; font-size: 1.1rem; }
+    .cell.miss::after { content: '·'; font-size: 1.4rem; color: #4d96ff; }
+    .cell.sunk { background: #7a1a00; cursor: default; }
+    .cell.sunk::after { content: '🔥'; font-size: 1.1rem; }
+
+    /* Ship selector */
+    .ships-panel { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 12px 0; }
+    .ship-btn {
+      background: #1a2a4a;
+      border: 2px solid #2a3a6a;
+      color: #fff; padding: 8px 14px;
+      border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+    }
+    .ship-btn.selected { border-color: #4d96ff; background: #1a3a6a; }
+    .ship-btn.placed   { border-color: #6bcb7744; color: #6bcb77; cursor: default; }
+    .ship-btn .blocks  { display: flex; gap: 2px; }
+    .ship-btn .blk     { width: 12px; height: 12px; background: #4d96ff; border-radius: 2px; }
+
+    /* Orientation toggle */
+    #orient-btn {
+      background: #1a2a4a; border: 2px solid #4d96ff55;
+      color: #4d96ff; padding: 7px 18px;
+      border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin: 4px 0 12px;
+    }
+    #orient-btn:hover { background: #1a3a6a; }
+
+    /* Buttons */
+    button.primary {
+      background: #4d96ff; color: #fff;
+      border: none; padding: 10px 28px;
+      border-radius: 8px; font-size: 1rem; cursor: pointer;
+      margin-top: 10px;
+    }
+    button.primary:hover { background: #2979d8; }
+    button.danger {
+      background: #cc2200; color: #fff;
+      border: none; padding: 10px 28px;
+      border-radius: 8px; font-size: 1rem; cursor: pointer;
+      margin-top: 10px;
+    }
+
+    /* Status */
+    #status { font-size: 1rem; color: #ffd93d; min-height: 24px; margin: 8px 0; text-align: center; }
+    #player-turn { font-size: 1.3rem; font-weight: bold; margin-bottom: 4px; }
+
+    /* Win screen */
+    #win-msg { font-size: 2rem; color: #ffd93d; margin-bottom: 8px; }
+
+    .row-labels, .col-labels {
+      display: flex;
+      gap: 3px;
+    }
+    .row-labels { flex-direction: column; margin-right: 4px; }
+    .col-labels { margin-bottom: 4px; }
+    .lbl { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #556; }
+  </style>
+</head>
+<body>
+  <a href="../index.html" id="back">← Game Hub</a>
+  <h1>🚢 Battleship</h1>
+  <p id="subtitle">2 Players · Pass &amp; Play</p>
+
+  <!-- Pass-device cover -->
+  <div id="cover-screen">
+    <div style="font-size:4rem">🙈</div>
+    <h2 id="cover-title">Pass the device!</h2>
+    <p id="cover-text">Hand the device to the other player, then press Ready.</p>
+    <button class="primary" id="cover-btn" onclick="hideCover()">👀 I'm Ready</button>
+  </div>
+
+  <!-- Setup screen -->
+  <div class="screen active" id="setup-screen">
+    <div id="player-turn">Player 1 — Place your ships</div>
+    <p style="color:#888;font-size:0.85rem;margin-bottom:10px">Select a ship, then click the grid to place it.</p>
+
+    <div class="ships-panel" id="ships-panel"></div>
+    <button id="orient-btn" onclick="toggleOrient()">Orientation: Horizontal</button>
+
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div style="display:flex">
+          <div class="row-labels" id="setup-row-labels"></div>
+          <div class="grid-wrap">
+            <div class="col-labels" id="setup-col-labels"></div>
+            <div class="grid" id="setup-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status"></div>
+    <button class="primary" id="done-btn" onclick="doneSetup()" style="display:none">✅ Done — Pass to other player</button>
+  </div>
+
+  <!-- Attack screen -->
+  <div class="screen" id="attack-screen">
+    <div id="attack-player-turn">Player 1's turn</div>
+    <p style="color:#888;font-size:0.85rem;margin-bottom:12px">Click on the <strong>enemy sea</strong> to fire!</p>
+
+    <div style="display:flex;gap:40px;flex-wrap:wrap;justify-content:center">
+      <!-- Enemy grid (attack target) -->
+      <div class="grid-wrap">
+        <div class="grid-label">🎯 Enemy Sea</div>
+        <div style="display:flex">
+          <div class="row-labels" id="atk-row-labels"></div>
+          <div>
+            <div class="col-labels" id="atk-col-labels"></div>
+            <div class="grid" id="attack-grid"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Own grid (status view) -->
+      <div class="grid-wrap">
+        <div class="grid-label">🛡️ Your Fleet</div>
+        <div style="display:flex">
+          <div class="row-labels" id="own-row-labels"></div>
+          <div>
+            <div class="col-labels" id="own-col-labels"></div>
+            <div class="grid" id="own-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status2"></div>
+  </div>
+
+  <!-- Win screen -->
+  <div class="screen" id="win-screen">
+    <div id="win-msg"></div>
+    <p style="color:#aaa;margin-bottom:10px">All enemy ships sunk!</p>
+    <button class="primary" onclick="location.reload()">Play Again</button>
+  </div>
+
+  <script>
+    const COLS = 'ABCDEFGHIJ'.split('');
+    const ROWS = Array.from({length: 10}, (_, i) => i + 1);
+
+    const SHIPS_DEF = [
+      { name: 'Carrier',    size: 5, icon: '🛳️' },
+      { name: 'Battleship', size: 4, icon: '⚓' },
+      { name: 'Cruiser',    size: 3, icon: '🚢' },
+      { name: 'Submarine',  size: 3, icon: '🤿' },
+      { name: 'Destroyer',  size: 2, icon: '⚡' },
+    ];
+
+    // Game state for two players
+    const players = [
+      { board: newBoard(), ships: [], placed: [] },
+      { board: newBoard(), ships: [], placed: [] },
+    ];
+
+    let setupPlayer = 0; // 0 or 1 — who's placing ships
+    let attackPlayer = 0; // who's attacking
+
+    let selectedShip = null;
+    let horizontal = true;
+    let setupShipIndex = -1; // which ship index is selected
+
+    function newBoard() {
+      return Array.from({length: 10}, () => Array(10).fill(0));
+    }
+
+    // ──────────────────────────────────────────────
+    // Grid label helpers
+    function buildLabels(colEl, rowEl) {
+      colEl.innerHTML = '';
+      rowEl.innerHTML = '';
+      COLS.forEach(c => {
+        const d = document.createElement('div');
+        d.className = 'lbl'; d.textContent = c;
+        colEl.appendChild(d);
+      });
+      ROWS.forEach(r => {
+        const d = document.createElement('div');
+        d.className = 'lbl'; d.textContent = r;
+        rowEl.appendChild(d);
+      });
+    }
+
+    // ──────────────────────────────────────────────
+    // Setup phase
+
+    function initSetup() {
+      buildLabels(
+        document.getElementById('setup-col-labels'),
+        document.getElementById('setup-row-labels')
+      );
+      renderShipsPanel();
+      renderSetupGrid();
+      document.getElementById('player-turn').textContent =
+        `Player ${setupPlayer + 1} — Place your ships`;
+      document.getElementById('status').textContent = '';
+      document.getElementById('done-btn').style.display = 'none';
+    }
+
+    function renderShipsPanel() {
+      const panel = document.getElementById('ships-panel');
+      panel.innerHTML = '';
+      const p = players[setupPlayer];
+      SHIPS_DEF.forEach((s, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'ship-btn';
+        const placed = p.placed[i];
+        if (placed) btn.classList.add('placed');
+        else if (setupShipIndex === i) btn.classList.add('selected');
+        btn.innerHTML = `
+          <span>${s.icon} ${s.name}</span>
+          <div class="blocks">${'<div class="blk"></div>'.repeat(s.size)}</div>
+        `;
+        if (!placed) btn.onclick = () => selectShip(i);
+        panel.appendChild(btn);
+      });
+    }
+
+    function selectShip(i) {
+      setupShipIndex = i;
+      selectedShip = SHIPS_DEF[i];
+      renderShipsPanel();
+      document.getElementById('status').textContent =
+        `Placing: ${selectedShip.icon} ${selectedShip.name} (size ${selectedShip.size}) — ${horizontal ? 'Horizontal' : 'Vertical'}`;
+    }
+
+    function toggleOrient() {
+      horizontal = !horizontal;
+      document.getElementById('orient-btn').textContent =
+        `Orientation: ${horizontal ? 'Horizontal' : 'Vertical'}`;
+      if (selectedShip) {
+        document.getElementById('status').textContent =
+          `Placing: ${selectedShip.icon} ${selectedShip.name} (size ${selectedShip.size}) — ${horizontal ? 'Horizontal' : 'Vertical'}`;
+      }
+    }
+
+    function renderSetupGrid() {
+      const grid = document.getElementById('setup-grid');
+      grid.innerHTML = '';
+      const board = players[setupPlayer].board;
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if (board[r][c]) cell.classList.add('ship');
+          cell.onclick = () => placeShip(r, c);
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function canPlace(board, row, col, size, horiz) {
+      for (let i = 0; i < size; i++) {
+        const r = horiz ? row : row + i;
+        const c = horiz ? col + i : col;
+        if (r < 0 || r >= 10 || c < 0 || c >= 10) return false;
+        if (board[r][c]) return false;
+      }
+      return true;
+    }
+
+    function placeShip(row, col) {
+      if (!selectedShip) {
+        document.getElementById('status').textContent = '⚠️ Select a ship first!';
+        return;
+      }
+      const p = players[setupPlayer];
+      if (p.placed[setupShipIndex]) return;
+
+      if (!canPlace(p.board, row, col, selectedShip.size, horizontal)) {
+        document.getElementById('status').textContent = '⚠️ Cannot place here!';
+        return;
+      }
+
+      // Place
+      const cells = [];
+      for (let i = 0; i < selectedShip.size; i++) {
+        const r = horizontal ? row : row + i;
+        const c = horizontal ? col + i : col;
+        p.board[r][c] = setupShipIndex + 1; // ship id 1-indexed
+        cells.push([r, c]);
+      }
+      p.ships.push({ id: setupShipIndex + 1, name: selectedShip.name, cells, hits: 0, sunk: false });
+      p.placed[setupShipIndex] = true;
+      selectedShip = null;
+      setupShipIndex = -1;
+      renderSetupGrid();
+      renderShipsPanel();
+
+      // Check if all placed
+      if (p.placed.filter(Boolean).length === SHIPS_DEF.length) {
+        document.getElementById('status').textContent = '✅ All ships placed!';
+        document.getElementById('done-btn').style.display = '';
+      } else {
+        document.getElementById('status').textContent = 'Ship placed! Select next.';
+      }
+    }
+
+    function doneSetup() {
+      if (setupPlayer === 0) {
+        // Show cover for player 2
+        showCover('Player 2', 'Player 2 — now place your ships.', () => {
+          setupPlayer = 1;
+          initSetup();
+        });
+      } else {
+        // Both done — start game
+        showCover('Player 1', 'The game starts now. Player 1 attacks first!', () => {
+          attackPlayer = 0;
+          startAttackPhase();
+        });
+      }
+    }
+
+    // ──────────────────────────────────────────────
+    // Cover / pass-device screen
+
+    let coverCallback = null;
+    function showCover(playerName, text, cb) {
+      coverCallback = cb;
+      document.getElementById('cover-title').textContent = `Pass to ${playerName}!`;
+      document.getElementById('cover-text').textContent = text;
+      document.getElementById('cover-screen').classList.add('active');
+    }
+
+    function hideCover() {
+      document.getElementById('cover-screen').classList.remove('active');
+      if (coverCallback) { coverCallback(); coverCallback = null; }
+    }
+
+    // ──────────────────────────────────────────────
+    // Attack phase
+
+    function startAttackPhase() {
+      document.getElementById('setup-screen').classList.remove('active');
+      document.getElementById('attack-screen').classList.add('active');
+      buildLabels(
+        document.getElementById('atk-col-labels'),
+        document.getElementById('atk-row-labels')
+      );
+      buildLabels(
+        document.getElementById('own-col-labels'),
+        document.getElementById('own-row-labels')
+      );
+      renderAttackPhase();
+    }
+
+    function renderAttackPhase() {
+      document.getElementById('attack-player-turn').textContent =
+        `Player ${attackPlayer + 1}'s Turn — Fire!`;
+      renderAttackGrid();
+      renderOwnGrid();
+      document.getElementById('status2').textContent = '';
+    }
+
+    // The grid attackPlayer fires on is the OPPONENT's board
+    function opponent() { return 1 - attackPlayer; }
+
+    // We track shots as a separate array to hide enemy ships
+    function renderAttackGrid() {
+      const grid = document.getElementById('attack-grid');
+      grid.innerHTML = '';
+      const opp = players[opponent()];
+      const shots = opp.shots || (opp.shots = Array.from({length:10}, ()=>Array(10).fill(0)));
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          const s = shots[r][c];
+          if (s === 'hit')  { cell.classList.add(isSunk(opp, r, c) ? 'sunk' : 'hit'); }
+          else if (s === 'miss') cell.classList.add('miss');
+          else cell.onclick = () => fireAt(r, c);
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function isSunk(oppPlayer, r, c) {
+      const ship = oppPlayer.ships.find(s => s.cells.some(([sr, sc]) => sr === r && sc === c));
+      return ship && ship.sunk;
+    }
+
+    function renderOwnGrid() {
+      const grid = document.getElementById('own-grid');
+      grid.innerHTML = '';
+      const me = players[attackPlayer];
+      const shots = me.shots || (me.shots = Array.from({length:10}, ()=>Array(10).fill(0)));
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if (me.board[r][c]) cell.classList.add('ship');
+          const s = shots[r][c];
+          if (s === 'hit')  cell.classList.add(isSunk(me, r, c) ? 'sunk' : 'hit');
+          else if (s === 'miss') cell.classList.add('miss');
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function fireAt(row, col) {
+      const opp = players[opponent()];
+      if (!opp.shots) opp.shots = Array.from({length:10}, ()=>Array(10).fill(0));
+      if (opp.shots[row][col]) return; // already shot
+
+      const hit = opp.board[row][col] !== 0;
+      opp.shots[row][col] = hit ? 'hit' : 'miss';
+
+      if (hit) {
+        // Find ship and add hit
+        const ship = opp.ships.find(s => s.cells.some(([r, c]) => r === row && c === col));
+        ship.hits++;
+        if (ship.hits === ship.cells.length) {
+          ship.sunk = true;
+          document.getElementById('status2').textContent = `💥 Hit & Sunk the ${ship.name}!`;
+        } else {
+          document.getElementById('status2').textContent = '💥 Hit!';
+        }
+      } else {
+        document.getElementById('status2').textContent = '💧 Miss!';
+      }
+
+      // Re-render
+      renderAttackGrid();
+      renderOwnGrid();
+
+      // Check win
+      if (opp.ships.every(s => s.sunk)) {
+        showWin(attackPlayer);
+        return;
+      }
+
+      // Switch turn after short delay
+      setTimeout(() => {
+        const nextPlayer = opponent();
+        showCover(
+          `Player ${nextPlayer + 1}`,
+          `Player ${attackPlayer + 1} just fired. Now it's Player ${nextPlayer + 1}'s turn!`,
+          () => {
+            attackPlayer = nextPlayer;
+            renderAttackPhase();
+          }
+        );
+      }, 800);
+    }
+
+    function showWin(winner) {
+      document.getElementById('attack-screen').classList.remove('active');
+      document.getElementById('win-screen').classList.add('active');
+      document.getElementById('win-msg').textContent = `🏆 Player ${winner + 1} wins!`;
+    }
+
+    // ──────────────────────────────────────────────
+    // Init
+    initSetup();
+  </script>
+</body>
+</html>
