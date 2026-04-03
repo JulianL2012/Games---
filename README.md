@@ -1,4 +1,4 @@
-# 🎮 Games Hub — 34 Browser Games
+# 🎮 Games Hub — 34 Browser Games + More Online
 
 > **All games are coded in pure HTML, CSS, and JavaScript — no downloads, no plugins, no accounts.  
 > Just open a file in any browser and play instantly!**
@@ -9,6 +9,8 @@
 
 This is a massive collection of **34 browser-based games**, all built from scratch using pure **HTML5 Canvas and Vanilla JavaScript**.  
 Every game is a single self-contained `.html` file — open it and play. No build tools, no dependencies, no internet required after downloading.
+
+The hub also includes a **🌐 Play More Online** section that links to popular free browser games on external sites (slither.io, agar.io, Krunker, Lichess, and more) — similar to how game portals like Coolmath or Poki work, giving you access to dozens of extra games with a single click.
 
 The games range from timeless **classics** (Snake, Tetris, Pac-Man, Chess, Solitaire) to **classroom favorites** (Cookie Clicker, Slope, Wordle, Geometry Dash, Dino Jump), **action/shooting** games (Space Invaders, Asteroids, Zombie Shooter), **multiplayer games** (Air Hockey, Battleship), and even a **Five Nights at Freddy's-inspired horror game** (Night Watch).
 
@@ -97,11 +99,28 @@ Open `index.html` on your phone browser and play — no app required.
 | 🚢 **Battleship** | Pass-and-play Battleship on the same device — place ships, take turns firing | Mouse |
 | 🌐 **Battleship LAN** | Battleship over your local Wi-Fi network — requires the Node.js server | Browser (LAN) |
 
+### 🌐 Play More Online
+
+| Game | Description |
+|------|-------------|
+| 🐍 **Slither.io** | Grow your snake by eating orbs — multiplayer |
+| 🔵 **Agar.io** | Eat smaller cells, avoid bigger ones — multiplayer |
+| ✏️ **Skribbl.io** | Multiplayer Pictionary in your browser |
+| 🔫 **Krunker.io** | Fast-paced browser FPS — no download needed |
+| 💠 **Diep.io** | Tank shooter with upgrades — multiplayer |
+| 🪱 **Wormate.io** | Candy-themed snake multiplayer |
+| 📄 **Paper.io 2** | Capture territory, cut enemy tails |
+| ⚗️ **Little Alchemy 2** | Combine elements to discover new things |
+| 🎨 **Quick, Draw!** | Draw a prompt; Google's AI guesses it |
+| 🏁 **TypeRacer** | Type quotes to race others online |
+| ♟️ **Lichess** | Free open-source online chess |
+| 🌍 **GeoGuessr** | Guess where in the world a Street View is |
+
+> External links open in a new tab and require an internet connection.
+
 ---
 
 ## 🛠️ Technical Details
-
-- **Language:** Pure HTML5 / CSS3 / Vanilla JavaScript — zero dependencies
 - **Engine:** HTML5 Canvas API for rendering
 - **Size:** Each game is a single `.html` file (30–120 KB), no external resources
 - **Compatibility:** Chrome, Firefox, Edge, Safari, Brave — any modern browser
