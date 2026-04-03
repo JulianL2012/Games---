@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎮 Game Hub — 34 Browser Games</title>
+  <title>🎮 Game Hub — 34 Browser Games + More Online</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -63,15 +63,26 @@
       padding: 2px 10px;
       font-size: 0.75rem;
     }
+    .external-note {
+      text-align: center;
+      color: #666;
+      font-size: 0.82rem;
+      margin: -8px 0 16px;
+    }
+    .card[target="_blank"]::after {
+      content: " ↗";
+      font-size: 0.75rem;
+      opacity: 0.5;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>🎮 Game Hub</h1>
-  <p style="color:#666;font-size:0.9rem;margin-top:6px">34 games • All HTML • No downloads needed</p>
+  <p style="color:#666;font-size:0.9rem;margin-top:6px">34 built-in games + bonus online links • All HTML • No downloads needed</p>
     <p>Pick a game and start playing — all run in your browser, no downloads needed!</p>
   </header>
-  <p style="text-align:center;color:#666;margin-bottom:24px;font-size:0.9rem">34 games — all run instantly in your browser. No downloads, no installs.</p>
+  <p style="text-align:center;color:#666;margin-bottom:24px;font-size:0.9rem">34 built-in games + bonus online links — all run instantly in your browser. No downloads, no installs.</p>
 
   <h2 style="text-align:center;color:#888;font-size:0.85rem;text-transform:uppercase;letter-spacing:2px;margin-bottom:16px">🕹️ Classics &amp; Puzzles</h2>
   <div class="grid">
@@ -137,6 +148,83 @@
       <h2>Night Watch</h2>
       <p>FNAF-inspired horror. Manage cameras, close doors, conserve power — survive until 6 AM!</p>
       <span class="badge" style="color:#c00;border-color:#60044;background:#1a000022">12 AM → 6 AM</span>
+    </a>
+  </div>
+
+  <h2 style="text-align:center;color:#888;font-size:0.85rem;text-transform:uppercase;letter-spacing:2px;margin:40px 0 8px">🌐 Play More Online</h2>
+  <p class="external-note">These links open free browser games on other sites in a new tab — internet required.</p>
+  <div class="grid">
+    <a class="card" href="https://slither.io" target="_blank" rel="noopener noreferrer">
+      <div class="icon">🐍</div>
+      <h2>Slither.io</h2>
+      <p>Grow your snake by eating glowing orbs and outmanoeuvre other players online!</p>
+      <span class="badge">Mouse · Multiplayer</span>
+    </a>
+    <a class="card" href="https://agar.io" target="_blank" rel="noopener noreferrer">
+      <div class="icon">🔵</div>
+      <h2>Agar.io</h2>
+      <p>Eat smaller cells to grow bigger — don't get eaten by larger ones!</p>
+      <span class="badge">Mouse · Multiplayer</span>
+    </a>
+    <a class="card" href="https://skribbl.io" target="_blank" rel="noopener noreferrer">
+      <div class="icon">✏️</div>
+      <h2>Skribbl.io</h2>
+      <p>Draw a word and have others guess it — multiplayer Pictionary in your browser.</p>
+      <span class="badge">Mouse · Multiplayer</span>
+    </a>
+    <a class="card" href="https://krunker.io" target="_blank" rel="noopener noreferrer">
+      <div class="icon">🔫</div>
+      <h2>Krunker.io</h2>
+      <p>Fast-paced browser FPS — join public lobbies and frag opponents online.</p>
+      <span class="badge">WASD + Mouse · Multiplayer</span>
+    </a>
+    <a class="card" href="https://diep.io" target="_blank" rel="noopener noreferrer">
+      <div class="icon">💠</div>
+      <h2>Diep.io</h2>
+      <p>Shoot shapes, level up, and upgrade your tank in this multiplayer arena shooter.</p>
+      <span class="badge">WASD + Mouse · Multiplayer</span>
+    </a>
+    <a class="card" href="https://wormate.io" target="_blank" rel="noopener noreferrer">
+      <div class="icon">🪱</div>
+      <h2>Wormate.io</h2>
+      <p>Eat sweets to grow your worm and circle enemies to eliminate them!</p>
+      <span class="badge">Mouse · Multiplayer</span>
+    </a>
+    <a class="card" href="https://paper-io.com" target="_blank" rel="noopener noreferrer">
+      <div class="icon">📄</div>
+      <h2>Paper.io 2</h2>
+      <p>Capture territory by drawing loops — but don't let anyone cut your tail!</p>
+      <span class="badge">Arrows / Swipe · Multiplayer</span>
+    </a>
+    <a class="card" href="https://littlealchemy2.com" target="_blank" rel="noopener noreferrer">
+      <div class="icon">⚗️</div>
+      <h2>Little Alchemy 2</h2>
+      <p>Combine elements to discover hundreds of new items — from fire to life!</p>
+      <span class="badge">Mouse · Puzzle</span>
+    </a>
+    <a class="card" href="https://quickdraw.withgoogle.com" target="_blank" rel="noopener noreferrer">
+      <div class="icon">🎨</div>
+      <h2>Quick, Draw!</h2>
+      <p>Draw a prompt in 20 seconds and let Google's neural network guess what it is.</p>
+      <span class="badge">Mouse / Touch · Solo</span>
+    </a>
+    <a class="card" href="https://typeracer.com" target="_blank" rel="noopener noreferrer">
+      <div class="icon">🏁</div>
+      <h2>TypeRacer</h2>
+      <p>Race other typists by typing quotes as fast as you can — global leaderboards!</p>
+      <span class="badge">Keyboard · Multiplayer</span>
+    </a>
+    <a class="card" href="https://lichess.org" target="_blank" rel="noopener noreferrer">
+      <div class="icon">♟️</div>
+      <h2>Lichess</h2>
+      <p>100% free, open-source chess — play online, vs AI, or solve puzzles.</p>
+      <span class="badge">Mouse · Free · Open Source</span>
+    </a>
+    <a class="card" href="https://www.geoguessr.com/free" target="_blank" rel="noopener noreferrer">
+      <div class="icon">🌍</div>
+      <h2>GeoGuessr</h2>
+      <p>Drop into a random Street View location and guess where in the world you are!</p>
+      <span class="badge">Mouse · Daily Free Plays</span>
     </a>
   </div>
 </body>
