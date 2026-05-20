@@ -103,7 +103,7 @@
 
   function isWhite(p){ return p && p===p.toUpperCase(); }
   function isBlack(p){ return p && p===p.toLowerCase(); }
-  function sideOf(p){ return isWhite(p)?'W':'B'; }
+  function sideOf(p){ return p ? (isWhite(p)?'W':'B') : null; }
   function upper(p){ return p.toUpperCase(); }
 
   function inBounds(r,c){ return r>=0&&r<8&&c>=0&&c<8; }
